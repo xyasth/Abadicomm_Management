@@ -2,6 +2,8 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { readSheet, appendSheet } from "./googleSheets";
+
 
 function createWindow(): void {
   // Create the browser window.
@@ -51,7 +53,20 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
+  ipcMain.handle("get-workers", async () => {
+    const rows = await readSheet("Worker!A2:C");
 
+    return rows.map(r => ({
+      id: r[0] || "",
+      name: r[1] || "",
+      password: r[2] || "", // sesuai sheet kamu
+    }));
+  });
+
+  ipcMain.handle("add-schedule", async (_event, payload) => {
+    await appendSheet("Schedule!A2:I", payload);
+    return { ok: true };
+  });
   createWindow()
 
   app.on('activate', function () {

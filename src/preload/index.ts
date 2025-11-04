@@ -1,5 +1,6 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from "electron";
 import { electronAPI } from '@electron-toolkit/preload'
+
 
 // Custom APIs for renderer
 const api = {}
@@ -9,6 +10,11 @@ const api = {}
 // just add to the DOM global.
 if (process.contextIsolated) {
   try {
+    contextBridge.exposeInMainWorld("electronAPI", {
+      getWorkers: () => ipcRenderer.invoke("get-workers"),
+      getJobdesc: () => ipcRenderer.invoke("get-jobdesc"),
+    });
+
     contextBridge.exposeInMainWorld('electron', electronAPI)
     contextBridge.exposeInMainWorld('api', api)
   } catch (error) {
