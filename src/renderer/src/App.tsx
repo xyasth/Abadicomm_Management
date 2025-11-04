@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useState } from "react"
 import Dashboard from "./pages/Dashboard"
+import LoginRegister from "./pages/LoginRegister"
 import Versions from "./components/Versions"
 import { LogOut } from "lucide-react"
 
@@ -21,10 +22,16 @@ function App(): React.JSX.Element {
               <span className="text-gray-600 font-medium">Dashboard</span>
             </div>
             <div className="flex items-center gap-4">
-              <button className="px-4 py-2 text-gray-600 hover:text-gray-900 font-medium rounded-lg hover:bg-gray-100 transition">
+              <button
+                onClick={() => setCurrentPage("register")}
+                className="px-4 py-2 text-gray-600 hover:text-gray-900 font-medium rounded-lg hover:bg-gray-100 transition"
+              >
                 Register Worker
               </button>
-              <button className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition">
+              <button
+                onClick={() => setCurrentPage("login")}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition"
+              >
                 <LogOut size={18} />
                 Logout
               </button>
@@ -64,6 +71,8 @@ function App(): React.JSX.Element {
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         {currentPage === "dashboard" && <Dashboard />}
         {currentPage === "versions" && <Versions />}
+        {currentPage === "login" && <LoginRegister initialMode="login" />}
+        {currentPage === "register" && <LoginRegister initialMode="register" />}
       </main>
     </div>
   )
