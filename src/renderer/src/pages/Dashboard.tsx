@@ -3,39 +3,60 @@
 import { useEffect, useState } from "react"
 import { ChevronRight, Plus } from "lucide-react"
 
-export default function Dashboard() {
+interface DashboardProps {
+  onNavigate?: (page: string) => void
+}
+
+export default function Dashboard({ onNavigate }: DashboardProps) {
   const [workers, setWorkers] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Simulate loading workers data
-    setTimeout(() => {
-      setWorkers([
-        { id: 1, name: "John Doe", status: "Active" },
-        { id: 2, name: "Jane Smith", status: "Active" },
-        { id: 3, name: "Mike Johnson", status: "On Leave" },
-        { id: 4, name: "Sarah Williams", status: "Active" },
-      ])
-      setIsLoading(false)
-    }, 500)
+    if (window.electronAPI?.getWorkers) {
+      window.electronAPI.getWorkers()
+        .then((data: any) => {
+          setWorkers(data)
+          setIsLoading(false)
+        })
+        .catch((error: any) => {
+          console.error("Error fetching workers:", error)
+          setIsLoading(false)
+        })
+    } else {
+      // Mock data for testing
+      setTimeout(() => {
+        setWorkers([
+          { id: "1", name: "John Doe", status: "Active" },
+          { id: "2", name: "Jane Smith", status: "Active" },
+          { id: "3", name: "Mike Johnson", status: "On Leave" },
+          { id: "4", name: "Sarah Williams", status: "Active" },
+        ])
+        setIsLoading(false)
+      }, 500)
+    }
   }, [])
 
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans">
-
       <div className="flex h-[calc(100vh-73px)]">
         {/* Sidebar */}
         <div className="w-64 border-r border-gray-200 bg-gray-50 p-6 space-y-4">
-          <button className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-[#E63946] hover:bg-[#d62828] transition text-white font-semibold">
+          <button
+            onClick={() => onNavigate?.("assign")}
+            className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-[#E63946] hover:bg-[#d62828] transition text-white font-semibold"
+          >
             <Plus size={18} />
             Assign Worker
           </button>
 
           <div className="pt-4 border-t border-gray-300 space-y-3">
             <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Quick Links</p>
-            <a href="#" className="block text-sm text-gray-600 hover:text-[#0066FF] transition">
-              Active Workers
-            </a>
+            <button
+              onClick={() => onNavigate?.("assign")}
+              className="block w-full text-left text-sm text-gray-600 hover:text-[#0066FF] transition"
+            >
+              Assign Workers
+            </button>
             <a href="#" className="block text-sm text-gray-600 hover:text-[#0066FF] transition">
               Schedule
             </a>

@@ -1,7 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { electronAPI } from '@electron-toolkit/preload'
 
-
 // Custom APIs for renderer
 const api = {}
 
@@ -13,6 +12,8 @@ if (process.contextIsolated) {
     contextBridge.exposeInMainWorld("electronAPI", {
       getWorkers: () => ipcRenderer.invoke("get-workers"),
       getJobdesc: () => ipcRenderer.invoke("get-jobdesc"),
+      getKetua: () => ipcRenderer.invoke("get-ketua"),
+      addSchedule: (payload: any[]) => ipcRenderer.invoke("add-schedule", payload),
     });
 
     contextBridge.exposeInMainWorld('electron', electronAPI)
