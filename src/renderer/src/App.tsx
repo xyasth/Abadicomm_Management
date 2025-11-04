@@ -6,9 +6,10 @@ import { useState } from "react"
 import Dashboard from "./pages/Dashboard"
 import Versions from "./components/Versions"
 import { LogOut } from "lucide-react"
+import TestPage from "./pages/FormAssign"
 
 function App(): React.JSX.Element {
-  const [currentPage, setCurrentPage] = useState("dashboard")
+  const [currentPage, setCurrentPage] = useState("testpage")
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
@@ -64,6 +65,7 @@ function App(): React.JSX.Element {
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         {currentPage === "dashboard" && <Dashboard />}
         {currentPage === "versions" && <Versions />}
+        {currentPage === "testpage" && <TestPage />}
       </main>
     </div>
   )
