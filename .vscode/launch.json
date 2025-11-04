@@ -1,32 +1,39 @@
 {
-  // Use IntelliSense to learn about possible attributes.
-  // Hover to view descriptions of existing attributes.
-  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "nextron:main",
+      "name": "Debug Main Process",
       "type": "node",
-      "request": "attach",
-      "port": 9292,
-      "skipFiles": ["<node_internals>/**"],
-      "localRoot": "${workspaceFolder}",
-      "sourceMaps": true
+      "request": "launch",
+      "cwd": "${workspaceRoot}",
+      "runtimeExecutable": "${workspaceRoot}/node_modules/.bin/electron-vite",
+      "windows": {
+        "runtimeExecutable": "${workspaceRoot}/node_modules/.bin/electron-vite.cmd"
+      },
+      "runtimeArgs": ["--sourcemap"],
+      "env": {
+        "REMOTE_DEBUGGING_PORT": "9222"
+      }
     },
     {
-      "name": "nextron:renderer",
-      "type": "chrome",
+      "name": "Debug Renderer Process",
+      "port": 9222,
       "request": "attach",
-      "port": 5858,
-      "urlFilter": "http://localhost:*",
-      "webRoot": "${workspaceFolder}/renderer",
-      "sourceMaps": true
+      "type": "chrome",
+      "webRoot": "${workspaceFolder}/src/renderer",
+      "timeout": 60000,
+      "presentation": {
+        "hidden": true
+      }
     }
   ],
   "compounds": [
     {
-      "name": "all",
-      "configurations": ["nextron:main", "nextron:renderer"]
+      "name": "Debug All",
+      "configurations": ["Debug Main Process", "Debug Renderer Process"],
+      "presentation": {
+        "order": 1
+      }
     }
   ]
 }

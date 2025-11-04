@@ -1,38 +1,34 @@
-<p align="center"><img src="https://i.imgur.com/X7dSE68.png"></p>
+# abadicomm-management
 
-## Usage
+An Electron application with React and TypeScript
 
-### Create an App
+## Recommended IDE Setup
 
-```
-# with npx
-$ npx create-nextron-app my-app --example basic-lang-javascript
+- [VSCode](https://code.visualstudio.com/) + [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) + [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode)
 
-# with yarn
-$ yarn create nextron-app my-app --example basic-lang-javascript
+## Project Setup
 
-# with pnpm
-$ pnpm dlx create-nextron-app my-app --example basic-lang-javascript
-```
+### Install
 
-### Install Dependencies
-
-```
-$ cd my-app
-
-# using yarn or npm
-$ yarn (or `npm install`)
-
-# using pnpm
-$ pnpm install --shamefully-hoist
+```bash
+$ npm install
 ```
 
-### Use it
+### Development
 
+```bash
+$ npm run dev
 ```
-# development mode
-$ yarn dev (or `npm run dev` or `pnpm run dev`)
 
-# production build
-$ yarn build (or `npm run build` or `pnpm run build`)
+### Build
+
+```bash
+# For windows
+$ npm run build:win
+
+# For macOS
+$ npm run build:mac
+
+# For Linux
+$ npm run build:linux
 ```
