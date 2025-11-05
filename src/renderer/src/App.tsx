@@ -53,6 +53,8 @@ function App(): React.JSX.Element {
         {currentPage === "dashboard" && <Dashboard />}
         {currentPage === "assign" && <AssignWorker />}
         {currentPage === "versions" && <Versions />}
+        {currentPage === "login" && <LoginRegister initialMode="login" />}
+        {currentPage === "register" && <LoginRegister initialMode="register" />}
       </main>
     </div>
   );
