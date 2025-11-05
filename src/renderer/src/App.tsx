@@ -1,29 +1,44 @@
 import type React from "react";
 import { useState } from "react";
 import Dashboard from "./pages/Dashboard";
-import LoginRegister from "./pages/LoginRegister";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
 import AssignWorker from "./pages/AssignWorker";
+import Versions from "./components/Versions";
 
 import { LogOut } from "lucide-react";
-import logo from "./assets/logo_small.png";
+import logo from "./assets/electron.svg";
 
-type Page = "dashboard" | "assign" | "login" | "register";
+type Page = "dashboard" | "assign" | "login" | "register" | "versions";
 
 function App(): React.JSX.Element {
   const [currentPage, setCurrentPage] = useState<Page>("login");
 
-  const handleAuthSuccess = () => {
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+
+  const handleAuthSuccess = (role: string) => {
+    setCurrentUserRole(role);
     setCurrentPage("dashboard");
   };
 
   const handleAuthNavigate = (page: "login" | "register") => {
+    setCurrentUserRole(null);
     setCurrentPage(page);
   };
+
+  const handleLogout = () => {
+    setCurrentUserRole(null);
+    setCurrentPage("login");
+  };
+
+  const goToDashboard = () => {
+    setCurrentPage("dashboard");
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
       <header className="bg-white shadow-sm border-b-2 border-blue-600">
-        <div className=" mx-auto px-6 py-4">
+        <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
             {/* 🔹 Logo + Nama App */}
             <div className="flex items-center gap-3">
@@ -37,22 +52,30 @@ function App(): React.JSX.Element {
               </h1>
             </div>
 
-            {/* 🔹 Tombol Aksi */}
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setCurrentPage("register")}
-                className="px-4 py-2 text-gray-600 hover:text-gray-900 font-medium rounded-lg hover:bg-gray-100 transition"
-              >
-                Register Worker
-              </button>
-              <button
-                onClick={() => setCurrentPage("login")}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition"
-              >
-                <LogOut size={18} />
-                Logout
-              </button>
-            </div>
+            {/* 🔹 Tombol Aksi  */}
+
+            {currentPage !== "login" && currentPage !== "register" && (
+              <div className="flex items-center gap-4">
+
+                {currentUserRole === '3' && (
+                  <button
+                    onClick={() => setCurrentPage("register")}
+                    className="px-4 py-2 text-gray-600 hover:text-gray-900 font-medium rounded-lg hover:bg-gray-100 transition"
+                  >
+                    Register Worker
+                  </button>
+                )}
+
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition"
+                >
+                  <LogOut size={18} />
+                  Logout
+                </button>
+              </div>
+            )}
+
           </div>
         </div>
       </header>
@@ -86,22 +109,21 @@ function App(): React.JSX.Element {
       )}
 
       {/* 🔹 Konten Utama */}
-      <main className=" mx-auto py-6 sm:px-6 lg:px-8">
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         {currentPage === "dashboard" && <Dashboard />}
         {currentPage === "assign" && <AssignWorker />}
 
         {currentPage === "login" && (
-          <LoginRegister
-            initialMode="login"
+          <Login
             onAuthSuccess={handleAuthSuccess}
             onNavigate={handleAuthNavigate}
           />
         )}
         {currentPage === "register" && (
-          <LoginRegister
-            initialMode="register"
-            onAuthSuccess={handleAuthSuccess}
+          <Register
             onNavigate={handleAuthNavigate}
+            onCancel={goToDashboard}
+            isAdminRegistering={currentUserRole === '3'}
           />
         )}
       </main>
