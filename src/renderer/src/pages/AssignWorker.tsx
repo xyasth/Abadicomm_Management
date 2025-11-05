@@ -274,13 +274,18 @@ export default function AssignWorker() {
           };
 
           if (window.electronAPI?.addSchedule) {
-            return await window.electronAPI.addSchedule(payload);
+            const result = await window.electronAPI.addSchedule(payload);
+            return {
+              ...result,
+              workerName: assignment.workerName
+            };
           }
-          return { ok: false };
+          return { ok: false, workerName: assignment.workerName };
         })
       );
 
       const successCount = results.filter(r => r.ok).length;
+      const failedResults = results.filter(r => !r.ok);
 
       if (successCount === assignments.length) {
         alert(`Successfully assigned ${assignments.length} worker(s)!`);
@@ -299,8 +304,18 @@ export default function AssignWorker() {
           supervisorId: "",
           supervisorName: ""
         }]);
+      } else if (successCount > 0) {
+        // Show which workers had conflicts
+        const errorMessages = failedResults
+          .map(r => `${r.workerName}: ${r.error || 'Unknown error'}`)
+          .join('\n\n');
+        alert(`Partially successful: ${successCount} out of ${assignments.length} workers assigned.\n\nErrors:\n${errorMessages}`);
       } else {
-        alert(`Partially successful: ${successCount} out of ${assignments.length} workers assigned.`);
+        // All failed
+        const errorMessages = failedResults
+          .map(r => `${r.workerName}: ${r.error || 'Unknown error'}`)
+          .join('\n\n');
+        alert(`Failed to assign workers:\n\n${errorMessages}`);
       }
     } catch (error) {
       console.error("Error assigning workers:", error);

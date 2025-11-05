@@ -26,6 +26,20 @@ function formatTimestampParts(timestamp: string | number) {
   return { date: datePart, time: timePart };
 }
 
+// Helper function to check for time conflicts
+function checkTimeConflict(
+  existingStart: number,
+  existingEnd: number,
+  newStart: number,
+  newEnd: number
+): boolean {
+  // Check if times overlap
+  // Conflict exists if:
+  // - New event starts before existing ends AND
+  // - New event ends after existing starts
+  return newStart < existingEnd && newEnd > existingStart;
+}
+
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: 900,
@@ -63,8 +77,6 @@ app.whenReady().then(() => {
   })
 
   ipcMain.on('ping', () => console.log('pong'))
-
-  // ========== GET HANDLERS ==========
 
   ipcMain.handle("get-workers", async () => {
     const rows = await readSheet("Worker!A3:D");
@@ -178,15 +190,63 @@ app.whenReady().then(() => {
   }) => {
     try {
       console.log("Adding schedule:", payload);
-      const nextId = await getNextId("Schedule!A3:A");
-      console.log("Next schedule ID:", nextId);
 
+      // Convert date + time to Unix timestamp (seconds)
       const startDateTime = new Date(`${payload.date}T${payload.startTime}:00`);
       const endDateTime = new Date(`${payload.date}T${payload.endTime}:00`);
 
       const startTimestamp = Math.floor(startDateTime.getTime() / 1000);
       const endTimestamp = Math.floor(endDateTime.getTime() / 1000);
 
+      // Check for time conflicts with existing schedules
+      const existingSchedules = await readSheet("Schedule!A3:G");
+
+      for (const schedule of existingSchedules) {
+        const scheduleWorkerId = schedule[3];
+        const scheduleStart = parseInt(schedule[1]);
+        const scheduleEnd = parseInt(schedule[2]);
+
+        // Check if same worker
+        if (scheduleWorkerId === payload.workerId) {
+          // Check if times conflict
+          if (checkTimeConflict(scheduleStart, scheduleEnd, startTimestamp, endTimestamp)) {
+            // Get the conflicting schedule details for better error message
+            const conflictStart = new Date(scheduleStart * 1000);
+            const conflictEnd = new Date(scheduleEnd * 1000);
+
+            const conflictDate = conflictStart.toLocaleDateString("id-ID", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+              timeZone: "Asia/Jakarta",
+            });
+
+            const conflictStartTime = conflictStart.toLocaleTimeString("id-ID", {
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+              timeZone: "Asia/Jakarta",
+            });
+
+            const conflictEndTime = conflictEnd.toLocaleTimeString("id-ID", {
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+              timeZone: "Asia/Jakarta",
+            });
+
+            return {
+              ok: false,
+              error: `Time conflict! Worker already has an event on ${conflictDate} from ${conflictStartTime} to ${conflictEndTime}`
+            };
+          }
+        }
+      }
+
+      const nextId = await getNextId("Schedule!A3:A");
+      console.log("Next schedule ID:", nextId);
+
+      // Format: [Id, Waktu Mulai, Waktu Selesai, Worker_id, Jobdesc_id, Supervisor_id, Tempat]
       const row = [
         nextId.toString(),
         startTimestamp.toString(),
