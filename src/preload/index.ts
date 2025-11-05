@@ -1,26 +1,24 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { electronAPI } from '@electron-toolkit/preload'
 
-// Custom APIs for renderer
 const api = {}
 
-// Use `contextBridge` APIs to expose Electron APIs to
-// renderer only if context isolation is enabled, otherwise
-// just add to the DOM global.
 if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld("electronAPI", {
       getWorkers: () => ipcRenderer.invoke("get-workers"),
       getJobdesc: () => ipcRenderer.invoke("get-jobdesc"),
       getKetua: () => ipcRenderer.invoke("get-ketua"),
-      addSchedule: (payload: any[]) => ipcRenderer.invoke("add-schedule", payload),
       getSchedule: () => ipcRenderer.invoke("get-schedule"),
-
+      getWorkersId: () => ipcRenderer.invoke("get-workers-id"),
       register: (name: string, password: string, role: string) =>
         ipcRenderer.invoke("register-user", name, password, role),
 
       login: (name: string, password: string) =>
         ipcRenderer.invoke("login-user", name, password),
+      addSchedule: (payload: any) => ipcRenderer.invoke("add-schedule", payload),
+      addJobdesc: (name: string) => ipcRenderer.invoke("add-jobdesc", name),
+      addSupervisor: (name: string) => ipcRenderer.invoke("add-supervisor", name),
     });
 
     contextBridge.exposeInMainWorld('electron', electronAPI)
@@ -29,8 +27,8 @@ if (process.contextIsolated) {
     console.error(error)
   }
 } else {
-  // @ts-ignore (define in dts)
+  // @ts-ignore
   window.electron = electronAPI
-  // @ts-ignore (define in dts)
+  // @ts-ignore
   window.api = api
 }

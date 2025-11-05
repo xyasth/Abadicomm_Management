@@ -3,12 +3,11 @@ import { useState } from "react";
 import Dashboard from "./pages/Dashboard";
 import LoginRegister from "./pages/LoginRegister";
 import AssignWorker from "./pages/AssignWorker";
-import Versions from "./components/Versions";
 
 import { LogOut } from "lucide-react";
-import logo from "./assets/electron.svg";
+import logo from "./assets/logo_small.png";
 
-type Page = "dashboard" | "assign" | "login" | "register" | "versions";
+type Page = "dashboard" | "assign" | "login" | "register";
 
 function App(): React.JSX.Element {
   const [currentPage, setCurrentPage] = useState<Page>("login");
