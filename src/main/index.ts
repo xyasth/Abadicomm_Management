@@ -138,3 +138,12 @@ app.on('window-all-closed', () => {
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and require them here.
+ipcMain.handle("get-jobdesc", async () => {
+  const rows = await readSheet("Jobdesc!A2:A");
+  return rows.map(r => r[0] || "").filter(v => v);
+});
+
+ipcMain.handle("get-ketua", async () => {
+  const rows = await readSheet("Ketua!A2:A");
+  return rows.map(r => r[0] || "").filter(v => v);
+});
