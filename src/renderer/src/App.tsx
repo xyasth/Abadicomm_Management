@@ -4,7 +4,7 @@ import Dashboard from "./pages/Dashboard";
 import Versions from "./components/Versions";
 import AssignWorker from "./pages/AssignWorker";
 import { LogOut } from "lucide-react";
-import logo from "./assets/electron.svg";
+import logo from "./assets/logo_small.png";
 
 function App(): React.JSX.Element {
   const [currentPage, setCurrentPage] = useState("dashboard");
