@@ -4,6 +4,28 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { readSheet, appendSheet } from "./googleSheets";
 
+function formatTimestampParts(timestamp: string | number) {
+  if (!timestamp) return { date: "", time: "" };
+  const date = new Date(Number(timestamp) * 1000); // konversi detik ke ms
+
+  const datePart = date.toLocaleDateString("id-ID", {
+    weekday: "long",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Jakarta",
+  });
+
+  const timePart = date.toLocaleTimeString("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Jakarta",
+  });
+
+  return { date: datePart, time: timePart };
+}
+
 
 function createWindow(): void {
   // Create the browser window.
@@ -63,10 +85,39 @@ app.whenReady().then(() => {
     }));
   });
 
-  ipcMain.handle("add-schedule", async (_event, payload) => {
-    await appendSheet("Schedule!A2:I", payload);
-    return { ok: true };
+  ipcMain.handle("get-schedule", async () => {
+    const scheduleRows = await readSheet("Schedule!A3:G");
+    const workerRows = await readSheet("Worker!A3:B");         // [id, name]
+    const jobdescRows = await readSheet("Jobdesc!A3:B");        // [id, name]
+
+    // buat map untuk lookup cepat
+    const workerMap = new Map(workerRows.map((r) => [r[0], r[1]]));
+    const jobdescMap = new Map(jobdescRows.map((r) => [r[0], r[1]]));
+
+    // gabungkan data
+    const schedules = scheduleRows.map((r) => {
+      const start = formatTimestampParts(r[1]);
+      const end = formatTimestampParts(r[2]);
+      return {
+        id: r[0] || "",
+        worker_id: r[3] || "",
+        worker_name: workerMap.get(r[3]) || "Unknown",
+        jobdesc_id: r[4] || "",
+        jobdesc_name: jobdescMap.get(r[4]) || "Unknown",
+        supervisor_id: r[5] || "",
+        supervisor_name: workerMap.get(r[5]) || "Unknown",
+        tempat: r[6] || "",
+        date: start.date,
+        start_time: start.time,
+        end_time: end.time,
+      };
+    });
+
+    return schedules;
   });
+
+
+
   createWindow()
 
   app.on('activate', function () {

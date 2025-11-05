@@ -13,6 +13,8 @@ if (process.contextIsolated) {
     contextBridge.exposeInMainWorld("electronAPI", {
       getWorkers: () => ipcRenderer.invoke("get-workers"),
       getJobdesc: () => ipcRenderer.invoke("get-jobdesc"),
+      getSchedule: () => ipcRenderer.invoke("get-schedule"),
+
     });
 
     contextBridge.exposeInMainWorld('electron', electronAPI)

@@ -7,6 +7,7 @@ declare global {
     electronAPI: {
       getWorkers: () => Promise<any>;
       getJobdesc: () => Promise<any>;
+      getSchedule: () => Promise<any>;
       // Tambah yang lain nanti
     };
   }
