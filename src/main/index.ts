@@ -2,11 +2,11 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { readSheet, appendSheet } from "./googleSheets";
+import { readSheet, appendSheet, getNextId } from "./googleSheets";
 
 function formatTimestampParts(timestamp: string | number) {
   if (!timestamp) return { date: "", time: "" };
-  const date = new Date(Number(timestamp) * 1000); // konversi detik ke ms
+  const date = new Date(Number(timestamp) * 1000);
 
   const datePart = date.toLocaleDateString("id-ID", {
     weekday: "long",
@@ -26,9 +26,7 @@ function formatTimestampParts(timestamp: string | number) {
   return { date: datePart, time: timePart };
 }
 
-
 function createWindow(): void {
-  // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
@@ -50,8 +48,6 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -59,42 +55,34 @@ function createWindow(): void {
   }
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
-  // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // IPC test
   ipcMain.on('ping', () => console.log('pong'))
+
+  // ========== EXISTING HANDLERS ==========
+
   ipcMain.handle("get-workers", async () => {
     const rows = await readSheet("Worker!A2:C");
-
     return rows.map(r => ({
       id: r[0] || "",
       name: r[1] || "",
-      password: r[2] || "", // sesuai sheet kamu
+      password: r[2] || "",
     }));
   });
 
   ipcMain.handle("get-schedule", async () => {
     const scheduleRows = await readSheet("Schedule!A3:G");
-    const workerRows = await readSheet("Worker!A3:B");         // [id, name]
-    const jobdescRows = await readSheet("Jobdesc!A3:B");        // [id, name]
+    const workerRows = await readSheet("Worker!A3:B");
+    const jobdescRows = await readSheet("Jobdesc!A3:B");
 
-    // buat map untuk lookup cepat
     const workerMap = new Map(workerRows.map((r) => [r[0], r[1]]));
     const jobdescMap = new Map(jobdescRows.map((r) => [r[0], r[1]]));
 
-    // gabungkan data
     const schedules = scheduleRows.map((r) => {
       const start = formatTimestampParts(r[1]);
       const end = formatTimestampParts(r[2]);
@@ -116,34 +104,110 @@ app.whenReady().then(() => {
     return schedules;
   });
 
+  ipcMain.handle("get-jobdesc", async () => {
+    const rows = await readSheet("Jobdesc!A2:B");
+    return rows.map(r => ({
+      id: r[0] || "",
+      name: r[1] || ""
+    })).filter(v => v.name);
+  });
 
+  ipcMain.handle("get-ketua", async () => {
+    // Ketua are workers with Role_id = 1 (Supervisor)
+    const rows = await readSheet("Worker!A2:D");
+    return rows
+      .filter(r => r[3] === "1") // Role_id = 1 is Supervisor
+      .map(r => ({
+        id: r[0] || "",
+        name: r[1] || ""
+      }))
+      .filter(v => v.name);
+  });
+
+  // ========== NEW HANDLERS ==========
+
+  // Add new Jobdesc
+  ipcMain.handle("add-jobdesc", async (_, jobdescName: string) => {
+    try {
+      const nextId = await getNextId("Jobdesc!A3:A");
+      await appendSheet("Jobdesc!A:B", [nextId.toString(), jobdescName]);
+      return { ok: true, id: nextId, name: jobdescName };
+    } catch (error) {
+      console.error("Error adding jobdesc:", error);
+      return { ok: false, error: String(error) };
+    }
+  });
+
+  // Add new Supervisor (Worker with Role_id = 1)
+  ipcMain.handle("add-supervisor", async (_, supervisorName: string) => {
+    try {
+      const nextId = await getNextId("Worker!A3:A");
+      const defaultPassword = "12121212"; // You can change this
+      const roleId = "1"; // Supervisor role
+
+      await appendSheet("Worker!A:D", [
+        nextId.toString(),
+        supervisorName,
+        defaultPassword,
+        roleId
+      ]);
+
+      return { ok: true, id: nextId, name: supervisorName };
+    } catch (error) {
+      console.error("Error adding supervisor:", error);
+      return { ok: false, error: String(error) };
+    }
+  });
+
+  // Add Schedule
+  ipcMain.handle("add-schedule", async (_, payload: {
+    workerId: string;
+    jobdescId: string;
+    supervisorId: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    location: string;
+  }) => {
+    try {
+      const nextId = await getNextId("Schedule!A3:A");
+
+      // Convert date + time to Unix timestamp (seconds)
+      const startDateTime = new Date(`${payload.date}T${payload.startTime}:00`);
+      const endDateTime = new Date(`${payload.date}T${payload.endTime}:00`);
+
+      const startTimestamp = Math.floor(startDateTime.getTime() / 1000);
+      const endTimestamp = Math.floor(endDateTime.getTime() / 1000);
+
+      // Format: [Id, Waktu Mulai, Waktu Selesai, Worker_id, Jobdesc_id, Supervisor_id, Tempat]
+      const row = [
+        nextId.toString(),
+        startTimestamp.toString(),
+        endTimestamp.toString(),
+        payload.workerId,
+        payload.jobdescId,
+        payload.supervisorId,
+        payload.location
+      ];
+
+      await appendSheet("Schedule!A:G", row);
+
+      return { ok: true, id: nextId };
+    } catch (error) {
+      console.error("Error adding schedule:", error);
+      return { ok: false, error: String(error) };
+    }
+  });
 
   createWindow()
 
   app.on('activate', function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
 })
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.
-ipcMain.handle("get-jobdesc", async () => {
-  const rows = await readSheet("Jobdesc!A2:A");
-  return rows.map(r => r[0] || "").filter(v => v);
-});
-
-ipcMain.handle("get-ketua", async () => {
-  const rows = await readSheet("Ketua!A2:A");
-  return rows.map(r => r[0] || "").filter(v => v);
-});

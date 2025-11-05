@@ -10,19 +10,37 @@ const auth = new google.auth.GoogleAuth({
 });
 
 const sheets = google.sheets({ version: "v4", auth });
+const spreadsheetId = '1sWQTqJuOc7K5LHxzsLHZZHV3Wdag7TAWfCLt1aOxYno';
 
 export async function readSheet(range: string) {
-  const spreadsheetId = '1sWQTqJuOc7K5LHxzsLHZZHV3Wdag7TAWfCLt1aOxYno';
   const res = await sheets.spreadsheets.values.get({ spreadsheetId, range });
   return res.data.values || [];
 }
 
 export async function appendSheet(range: string, row: any[]) {
-  const spreadsheetId = '1sWQTqJuOc7K5LHxzsLHZZHV3Wdag7TAWfCLt1aOxYno';
   await sheets.spreadsheets.values.append({
     spreadsheetId,
     range,
     valueInputOption: "USER_ENTERED",
     requestBody: { values: [row] },
+  });
+}
+
+export async function getNextId(range: string): Promise<number> {
+  const rows = await readSheet(range);
+  if (rows.length === 0) return 1;
+
+  const ids = rows.map(r => parseInt(r[0] || "0")).filter(id => !isNaN(id));
+  return ids.length > 0 ? Math.max(...ids) + 1 : 1;
+}
+
+export async function batchAppendSheet(range: string, rows: any[][]) {
+  if (rows.length === 0) return;
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId,
+    range,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: rows },
   });
 }
