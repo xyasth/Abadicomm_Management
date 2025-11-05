@@ -12,7 +12,7 @@ function App(): React.JSX.Element {
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
       <header className="bg-white shadow-sm border-b-2 border-blue-600">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className=" mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
             {/* 🔹 Logo + Nama App */}
             <div className="flex items-center gap-3">
@@ -40,7 +40,7 @@ function App(): React.JSX.Element {
         </div>
 
       </header>
-      <nav className="flex items-center justify-between bg-gray-50 border-b border-gray-200 px-8 py-4 shadow-sm max-w-7xl mx-auto">
+      <nav className="flex items-center justify-between bg-gray-50 border-b border-gray-200 px-8 py-4 shadow-sm">
         <div className="flex items-center gap-6">
           <button
             onClick={() => setCurrentPage("dashboard")}
@@ -67,7 +67,7 @@ function App(): React.JSX.Element {
       </nav>
 
       {/* 🔹 Konten Utama */}
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+      <main className=" mx-auto py-6 sm:px-6 lg:px-8">
         {currentPage === "dashboard" && <Dashboard />}
         {currentPage === "assign" && <AssignWorker />}
       </main>
