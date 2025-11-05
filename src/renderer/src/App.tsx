@@ -7,6 +7,7 @@ import Dashboard from "./pages/Dashboard"
 import AssignWorker from "./pages/AssignWorker"
 import Versions from "./components/Versions"
 import { LogOut } from "lucide-react"
+import logo from "./assets/electron.svg"
 
 function App(): React.JSX.Element {
   const [currentPage, setCurrentPage] = useState("dashboard")
@@ -17,13 +18,13 @@ function App(): React.JSX.Element {
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
+              <img
+                src={logo}
+                alt="ABADI Comm Logo"
+                className="w-10 h-10 object-contain"
+              />
               <h1 className="text-2xl font-bold text-blue-600">ABADI Comm</h1>
-              <span className="text-gray-400">|</span>
-              <span className="text-gray-600 font-medium">
-                {currentPage === "dashboard" && "Dashboard"}
-                {currentPage === "assign" && "Assign Worker"}
-                {currentPage === "versions" && "Versions"}
-              </span>
+
             </div>
             <div className="flex items-center gap-4">
               <button
