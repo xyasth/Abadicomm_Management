@@ -1,18 +1,40 @@
 "use client"
 
-import { useState } from "react"
-import { User, Lock } from "lucide-react"
+import { useState, useEffect } from "react"
+// We need one new icon
+import { User, Lock, UserCheck } from "lucide-react"
 
 type Mode = "login" | "register"
 
-export default function AuthPage({ initialMode = "login" }: { initialMode?: Mode }) {
+type Props = {
+  initialMode?: Mode;
+  onAuthSuccess: () => void;
+  onNavigate: (page: "login" | "register") => void;
+}
+
+export default function LoginRegister({
+  initialMode = "login",
+  onAuthSuccess,
+  onNavigate
+}: Props) {
   const [isLoginMode, setIsLoginMode] = useState(initialMode === "login")
   const [name, setName] = useState("")
   const [password, setPassword] = useState("")
+  // --- ADDED (2) ---
+  // New state for the role. Default to '2' (Karyawan)
+  const [role, setRole] = useState("2");
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    setIsLoginMode(initialMode === "login");
+    setError("");
+    setName("");
+    setPassword("");
+    setRole("2"); // Reset role when mode changes
+  }, [initialMode]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name || !password) {
       setError("Name and password are required.")
@@ -20,27 +42,45 @@ export default function AuthPage({ initialMode = "login" }: { initialMode?: Mode
     }
     setError("")
     setIsLoading(true)
-    console.log(`Submitting as ${isLoginMode ? "Login" : "Register"}:`, { name, password })
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false)
-      if (isLoginMode) {
-        console.log("Login successful (simulated)")
-        // handle successful login (redirect, state update, etc.)
-      } else {
-        console.log("Registration successful (simulated)")
-        // handle successful registration; optionally switch to login
-        setIsLoginMode(true)
+    if (isLoginMode) {
+      // Login logic (unchanged)
+      try {
+        const data = await window.electronAPI.login(name, password);
+        console.log("Login successful:", data.message);
+        onAuthSuccess();
+      } catch (apiError: any) {
+        console.error("Login failed:", apiError);
+        setError(apiError.message || "An error occurred during login.");
+      } finally {
+        setIsLoading(false);
       }
-    }, 1500)
+
+    } else {
+      // --- UPDATED (3) ---
+      // Register logic (now passes 'role')
+      try {
+        // Pass 'role' as the third argument
+        const data = await window.electronAPI.register(name, password, role);
+
+        console.log("Registration successful:", data.message);
+        onNavigate('login');
+
+      } catch (apiError: any) {
+        console.error("Registration failed:", apiError);
+        setError(apiError.message || "An error occurred during registration.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
   }
 
   const toggleMode = () => {
-    setIsLoginMode(!isLoginMode)
-    setError("")
-    setName("")
-    setPassword("")
+    if (isLoginMode) {
+      onNavigate('register');
+    } else {
+      onNavigate('login');
+    }
   }
 
   return (
@@ -98,6 +138,37 @@ export default function AuthPage({ initialMode = "login" }: { initialMode?: Mode
                 />
               </div>
             </div>
+
+            {!isLoginMode && (
+              <div>
+                <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
+                  Role
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <UserCheck className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <select
+                    id="role"
+                    name="role"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    required
+                    className="w-full pl-10 pr-10 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0066FF] focus:border-transparent transition appearance-none"
+                  >
+                    <option value="2">Karyawan</option>
+                    <option value="1">Supervisor</option>
+                    <option value="3">Admin</option>
+                  </select>
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            )}
+
 
             {error && <p className="text-sm text-red-600 text-center">{error}</p>}
 

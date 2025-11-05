@@ -3,6 +3,9 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { readSheet, appendSheet } from "./googleSheets";
+import bcrypt from 'bcryptjs';
+
+const saltRounds = 10;
 
 function formatTimestampParts(timestamp: string | number) {
   if (!timestamp) return { date: "", time: "" };
@@ -26,9 +29,58 @@ function formatTimestampParts(timestamp: string | number) {
   return { date: datePart, time: timePart };
 }
 
+async function loginUser(name: string, password: string) {
+  const rows = await readSheet("Worker!A2:C");
+
+  const user = rows.find(row => {
+    const sheetName = row[1];
+    return sheetName === name;
+  });
+
+  if (!user) {
+    throw new Error('Invalid name or password.');
+  }
+
+  const storedHash = user[2];
+
+  const isMatch = await bcrypt.compare(password, storedHash);
+
+  if (isMatch) {
+    return { success: true, message: 'Login successful!' };
+  } else {
+    throw new Error('Invalid name or password.');
+  }
+}
+
+async function registerUser(name: string, password: string, role: string) {
+
+  const rows = await readSheet("Worker!A2:B");
+
+  const names = rows.map(r => r[1]);
+  if (names.includes(name)) {
+    throw new Error('This name is already registered.');
+  }
+
+  const ids = rows
+    .map(r => Number(r[0]))
+    .filter(id => !isNaN(id));
+
+  let maxId = 0;
+  if (ids.length > 0) {
+    maxId = Math.max(...ids);
+  }
+
+  const newId = maxId + 1;
+
+  const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+  await appendSheet("Worker!A:D", [newId, name, hashedPassword, role]);
+
+  return { success: true, message: 'Registration successful!' };
+}
+
 
 function createWindow(): void {
-  // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
@@ -50,8 +102,6 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -59,42 +109,42 @@ function createWindow(): void {
   }
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
-  // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // IPC test
   ipcMain.on('ping', () => console.log('pong'))
+
+  ipcMain.handle("register-user", (event, name, password, role) => {
+    return registerUser(name, password, role);
+  });
+
+  ipcMain.handle("login-user", (event, name, password) => {
+    return loginUser(name, password);
+  });
+
   ipcMain.handle("get-workers", async () => {
-    const rows = await readSheet("Worker!A2:C");
+    const rows = await readSheet("Worker!A2:D");
 
     return rows.map(r => ({
       id: r[0] || "",
       name: r[1] || "",
-      password: r[2] || "", // sesuai sheet kamu
+      password: r[2] || "",
+      role_id: r[3] || "",
     }));
   });
 
   ipcMain.handle("get-schedule", async () => {
     const scheduleRows = await readSheet("Schedule!A3:G");
-    const workerRows = await readSheet("Worker!A3:B");         // [id, name]
+    const workerRows = await readSheet("Worker!A3:B");        // [id, name]
     const jobdescRows = await readSheet("Jobdesc!A3:B");        // [id, name]
 
-    // buat map untuk lookup cepat
     const workerMap = new Map(workerRows.map((r) => [r[0], r[1]]));
     const jobdescMap = new Map(jobdescRows.map((r) => [r[0], r[1]]));
 
-    // gabungkan data
     const schedules = scheduleRows.map((r) => {
       const start = formatTimestampParts(r[1]);
       const end = formatTimestampParts(r[2]);
@@ -116,34 +166,25 @@ app.whenReady().then(() => {
     return schedules;
   });
 
+  ipcMain.handle("get-jobdesc", async () => {
+    const rows = await readSheet("Jobdesc!A2:A");
+    return rows.map(r => r[0] || "").filter(v => v);
+  });
 
+  ipcMain.handle("get-ketua", async () => {
+    const rows = await readSheet("Ketua!A2:A");
+    return rows.map(r => r[0] || "").filter(v => v);
+  });
 
   createWindow()
 
   app.on('activate', function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
 })
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.
-ipcMain.handle("get-jobdesc", async () => {
-  const rows = await readSheet("Jobdesc!A2:A");
-  return rows.map(r => r[0] || "").filter(v => v);
-});
-
-ipcMain.handle("get-ketua", async () => {
-  const rows = await readSheet("Ketua!A2:A");
-  return rows.map(r => r[0] || "").filter(v => v);
-});

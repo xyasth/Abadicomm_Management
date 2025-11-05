@@ -16,6 +16,11 @@ if (process.contextIsolated) {
       addSchedule: (payload: any[]) => ipcRenderer.invoke("add-schedule", payload),
       getSchedule: () => ipcRenderer.invoke("get-schedule"),
 
+      register: (name: string, password: string, role: string) =>
+        ipcRenderer.invoke("register-user", name, password, role),
+
+      login: (name: string, password: string) =>
+        ipcRenderer.invoke("login-user", name, password),
     });
 
     contextBridge.exposeInMainWorld('electron', electronAPI)
