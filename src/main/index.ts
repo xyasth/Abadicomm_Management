@@ -64,11 +64,13 @@ app.whenReady().then(() => {
 
   ipcMain.on('ping', () => console.log('pong'))
 
-  // ========== EXISTING HANDLERS ==========
+  // ========== GET HANDLERS ==========
 
   ipcMain.handle("get-workers", async () => {
-    const rows = await readSheet("Worker!A2:C");
-    return rows.map(r => ({
+    const rows = await readSheet("Worker!A3:D");
+    return rows
+    .filter(r => r[3] === "2")
+    .map(r => ({
       id: r[0] || "",
       name: r[1] || "",
       password: r[2] || "",
@@ -105,7 +107,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("get-jobdesc", async () => {
-    const rows = await readSheet("Jobdesc!A2:B");
+    const rows = await readSheet("Jobdesc!A3:B");
     return rows.map(r => ({
       id: r[0] || "",
       name: r[1] || ""
@@ -113,10 +115,9 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("get-ketua", async () => {
-    // Ketua are workers with Role_id = 1 (Supervisor)
-    const rows = await readSheet("Worker!A2:D");
+    const rows = await readSheet("Worker!A3:D");
     return rows
-      .filter(r => r[3] === "1") // Role_id = 1 is Supervisor
+      .filter(r => r[3] === "1")
       .map(r => ({
         id: r[0] || "",
         name: r[1] || ""
@@ -124,13 +125,17 @@ app.whenReady().then(() => {
       .filter(v => v.name);
   });
 
-  // ========== NEW HANDLERS ==========
+  // ========== ADD HANDLERS ==========
 
-  // Add new Jobdesc
   ipcMain.handle("add-jobdesc", async (_, jobdescName: string) => {
     try {
+      console.log("Adding jobdesc:", jobdescName);
       const nextId = await getNextId("Jobdesc!A3:A");
-      await appendSheet("Jobdesc!A:B", [nextId.toString(), jobdescName]);
+      console.log("Next jobdesc ID:", nextId);
+
+      await appendSheet("Jobdesc", [nextId.toString(), jobdescName]);
+      console.log("Jobdesc added successfully");
+
       return { ok: true, id: nextId, name: jobdescName };
     } catch (error) {
       console.error("Error adding jobdesc:", error);
@@ -138,19 +143,22 @@ app.whenReady().then(() => {
     }
   });
 
-  // Add new Supervisor (Worker with Role_id = 1)
   ipcMain.handle("add-supervisor", async (_, supervisorName: string) => {
     try {
+      console.log("Adding supervisor:", supervisorName);
       const nextId = await getNextId("Worker!A3:A");
-      const defaultPassword = "12121212"; // You can change this
-      const roleId = "1"; // Supervisor role
+      console.log("Next worker ID:", nextId);
 
-      await appendSheet("Worker!A:D", [
+      const defaultPassword = "12121212";
+      const roleId = "1";
+
+      await appendSheet("Worker", [
         nextId.toString(),
         supervisorName,
         defaultPassword,
         roleId
       ]);
+      console.log("Supervisor added successfully");
 
       return { ok: true, id: nextId, name: supervisorName };
     } catch (error) {
@@ -159,7 +167,6 @@ app.whenReady().then(() => {
     }
   });
 
-  // Add Schedule
   ipcMain.handle("add-schedule", async (_, payload: {
     workerId: string;
     jobdescId: string;
@@ -170,16 +177,16 @@ app.whenReady().then(() => {
     location: string;
   }) => {
     try {
+      console.log("Adding schedule:", payload);
       const nextId = await getNextId("Schedule!A3:A");
+      console.log("Next schedule ID:", nextId);
 
-      // Convert date + time to Unix timestamp (seconds)
       const startDateTime = new Date(`${payload.date}T${payload.startTime}:00`);
       const endDateTime = new Date(`${payload.date}T${payload.endTime}:00`);
 
       const startTimestamp = Math.floor(startDateTime.getTime() / 1000);
       const endTimestamp = Math.floor(endDateTime.getTime() / 1000);
 
-      // Format: [Id, Waktu Mulai, Waktu Selesai, Worker_id, Jobdesc_id, Supervisor_id, Tempat]
       const row = [
         nextId.toString(),
         startTimestamp.toString(),
@@ -190,7 +197,8 @@ app.whenReady().then(() => {
         payload.location
       ];
 
-      await appendSheet("Schedule!A:G", row);
+      await appendSheet("Schedule", row);
+      console.log("Schedule added successfully");
 
       return { ok: true, id: nextId };
     } catch (error) {

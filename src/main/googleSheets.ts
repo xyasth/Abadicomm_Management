@@ -18,14 +18,28 @@ export async function readSheet(range: string) {
 }
 
 export async function appendSheet(range: string, row: any[]) {
-  await sheets.spreadsheets.values.append({
-    spreadsheetId,
-    range,
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values: [row] },
-  });
+  try {
+    console.log(`Appending to ${range}:`, row);
+
+    // If range doesn't include cell references, append !A:Z to it
+    const fullRange = range.includes('!') ? range : `${range}!A:Z`;
+
+    const result = await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: fullRange,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [row] },
+    });
+
+    console.log(`Append successful:`, result.data.updates);
+    return result;
+  } catch (error) {
+    console.error(`Error appending to ${range}:`, error);
+    throw error;
+  }
 }
 
+// New function to get the next ID for a table
 export async function getNextId(range: string): Promise<number> {
   const rows = await readSheet(range);
   if (rows.length === 0) return 1;
@@ -34,6 +48,7 @@ export async function getNextId(range: string): Promise<number> {
   return ids.length > 0 ? Math.max(...ids) + 1 : 1;
 }
 
+// New function to batch append multiple rows
 export async function batchAppendSheet(range: string, rows: any[][]) {
   if (rows.length === 0) return;
 
