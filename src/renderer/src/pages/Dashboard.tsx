@@ -1,3 +1,5 @@
+"use client"
+
 import { useEffect, useState } from "react";
 import { ChevronRight, Plus} from "lucide-react";
 
@@ -38,29 +40,43 @@ export default function Dashboard() {
     return hours;
   };
 
-  // 🔹 Konversi data schedule mentah (pakai start_time, end_time, date)
+  // Konversi data schedule mentah (pakai start_time, end_time, date)
   const parseScheduleData = (schedules: any[]) => {
-    const table: Record<string, Record<string, any[]>> = {};
+    const tempTable: Record<string, Record<string, any>> = {};
 
     schedules.forEach((item) => {
       const dayKey = item.date.split(",")[0].trim(); // contoh: "Selasa"
-
       const [startHour] = item.start_time.split(".");
       const [endHour] = item.end_time.split(".");
-
       const timeKey = `${startHour.padStart(2, "0")}:00 - ${endHour.padStart(2, "0")}:00`;
 
-      if (!table[dayKey]) table[dayKey] = {};
-      if (!table[dayKey][timeKey]) table[dayKey][timeKey] = [];
+      const supervisor = item.supervisor_name;
 
-      table[dayKey][timeKey].push({
+      if (!tempTable[dayKey]) tempTable[dayKey] = {};
+      if (!tempTable[dayKey][timeKey]) tempTable[dayKey][timeKey] = {};
+
+      if (!tempTable[dayKey][timeKey][supervisor]) {
+        tempTable[dayKey][timeKey][supervisor] = {
+          supervisor_name: supervisor,
+          workers: [],
+        };
+      }
+
+      tempTable[dayKey][timeKey][supervisor].workers.push({
         worker_name: item.worker_name,
         jobdesc_name: item.jobdesc_name,
-        supervisor_name: item.supervisor_name,
       });
     });
 
-    return table;
+    const finalTable: Record<string, Record<string, any[]>> = {};
+    for (const day in tempTable) {
+      finalTable[day] = {};
+      for (const time in tempTable[day]) {
+        finalTable[day][time] = Object.values(tempTable[day][time]);
+      }
+    }
+
+    return finalTable;
   };
 
   const weekDates = getCurrentWeekDates();
@@ -101,15 +117,12 @@ export default function Dashboard() {
             <p className="text-gray-600">
               View and manage worker schedules from Google Sheets
             </p>
-
-
           </div>
           <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#E63946] hover:bg-[#d62828] transition text-white font-semibold">
             <Plus size={18} />
             Assign Worker
           </button>
         </div>
-
 
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition border-l-4 border-l-[#0066FF]">
           <div className="overflow-x-auto">
@@ -168,7 +181,6 @@ export default function Dashboard() {
                                 ))}
                               </div>
                             ))}
-
                           </td>
                         );
                       })}
