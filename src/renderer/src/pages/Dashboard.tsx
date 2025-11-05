@@ -1,154 +1,201 @@
-"use client"
+import { useEffect, useState } from "react";
+import { ChevronRight, Plus } from "lucide-react";
 
-import { useEffect, useState } from "react"
-import { ChevronRight, Plus } from "lucide-react"
+export default function Dashboard() {
+  const [schedule, setSchedule] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [scheduleTable, setScheduleTable] = useState<any>({});
 
-interface DashboardProps {
-  onNavigate?: (page: string) => void
-}
+  // 🔹 Ambil tanggal minggu ini (Senin–Minggu)
+  function getCurrentWeekDates() {
+    const today = new Date();
+    const currentDay = today.getDay();
+    const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + diffToMonday);
 
-export default function Dashboard({ onNavigate }: DashboardProps) {
-  const [workers, setWorkers] = useState<any[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      return {
+        day: d.toLocaleDateString("id-ID", { weekday: "long" }),
+        date: d.toLocaleDateString("id-ID", {
+          day: "2-digit",
+          month: "short",
+        }),
+      };
+    });
+  }
+
+  // 🔹 Jam dari 07:00–21:00 per 1 jam
+  const generateTimeSlots = () => {
+    const hours: string[] = [];
+    for (let h = 7; h < 21; h++) {
+      const start = String(h).padStart(2, "0");
+      const end = String(h + 1).padStart(2, "0");
+      hours.push(`${start}:00 - ${end}:00`);
+    }
+    return hours;
+  };
+
+  // 🔹 Konversi data schedule mentah (pakai start_time, end_time, date)
+  const parseScheduleData = (schedules: any[]) => {
+    const table: Record<string, Record<string, any[]>> = {};
+
+    schedules.forEach((item) => {
+      const dayKey = item.date.split(",")[0].trim(); // contoh: "Selasa"
+
+      const [startHour] = item.start_time.split(".");
+      const [endHour] = item.end_time.split(".");
+
+      const timeKey = `${startHour.padStart(2, "0")}:00 - ${endHour.padStart(2, "0")}:00`;
+
+      if (!table[dayKey]) table[dayKey] = {};
+      if (!table[dayKey][timeKey]) table[dayKey][timeKey] = [];
+
+      table[dayKey][timeKey].push({
+        worker_name: item.worker_name,
+        jobdesc_name: item.jobdesc_name,
+        supervisor_name: item.supervisor_name,
+      });
+    });
+
+    return table;
+  };
+
+  const weekDates = getCurrentWeekDates();
+  const timeSlots = generateTimeSlots();
 
   useEffect(() => {
-    if (window.electronAPI?.getWorkers) {
-      window.electronAPI.getWorkers()
-        .then((data: any) => {
-          setWorkers(data)
-          setIsLoading(false)
-        })
-        .catch((error: any) => {
-          console.error("Error fetching workers:", error)
-          setIsLoading(false)
-        })
-    } else {
-      // Mock data for testing
-      setTimeout(() => {
-        setWorkers([
-          { id: "1", name: "John Doe", status: "Active" },
-          { id: "2", name: "Jane Smith", status: "Active" },
-          { id: "3", name: "Mike Johnson", status: "On Leave" },
-          { id: "4", name: "Sarah Williams", status: "Active" },
-        ])
-        setIsLoading(false)
-      }, 500)
+    window.electronAPI
+      .getSchedule()
+      .then((data) => {
+        console.log("📦 schedule data:", data);
+        setSchedule(data);
+      })
+      .catch((err) => console.error("Error fetching schedule:", err))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (schedule.length > 0) {
+      const parsed = parseScheduleData(schedule);
+      console.log("🧩 Parsed Table:", parsed);
+      setScheduleTable(parsed);
     }
-  }, [])
+  }, [schedule]);
+
+  const getScheduleCell = (day: string, timeSlot: string) => {
+    const dayData = scheduleTable[day];
+    if (!dayData) return [];
+    return dayData[timeSlot] || [];
+  };
 
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans">
-      <div className="flex h-[calc(100vh-73px)]">
-        {/* Sidebar */}
-        <div className="w-64 border-r border-gray-200 bg-gray-50 p-6 space-y-4">
-          <button
-            onClick={() => onNavigate?.("assign")}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-[#E63946] hover:bg-[#d62828] transition text-white font-semibold"
-          >
-            <Plus size={18} />
-            Assign Worker
-          </button>
+      {/* 🔹 Navbar di atas */}
+      <nav className="flex items-center justify-between bg-gray-50 border-b border-gray-200 px-8 py-4 shadow-sm">
+        <div className="flex items-center gap-6">
+          <a href="#" className="text-sm text-gray-700 hover:text-blue-600 font-medium">
+            Schedule
+          </a>
+          <a href="#" className="text-sm text-gray-700 hover:text-blue-600 font-medium">
+            Workers
+          </a>
+        </div>
+        <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#E63946] hover:bg-[#d62828] transition text-white font-semibold">
+          <Plus size={18} />
+          Add Schedule
+        </button>
+      </nav>
 
-          <div className="pt-4 border-t border-gray-300 space-y-3">
-            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Quick Links</p>
-            <button
-              onClick={() => onNavigate?.("assign")}
-              className="block w-full text-left text-sm text-gray-600 hover:text-[#0066FF] transition"
-            >
-              Assign Workers
-            </button>
-            <a href="#" className="block text-sm text-gray-600 hover:text-[#0066FF] transition">
-              Schedule
-            </a>
-            <a href="#" className="block text-sm text-gray-600 hover:text-[#0066FF] transition">
-              Reports
-            </a>
-          </div>
+      {/* 🔹 Main Content */}
+      <main className="p-8 space-y-6">
+        <div>
+          <h2 className="text-3xl font-bold mb-2 text-gray-900">Weekly Schedule</h2>
+          <p className="text-gray-600">
+            View and manage worker schedules from Google Sheets
+          </p>
         </div>
 
-        {/* Main Content */}
-        <div className="flex-1 overflow-auto">
-          <div className="p-8 space-y-6">
-            <div>
-              <h2 className="text-3xl font-bold mb-2 text-gray-900">Weekly Schedule</h2>
-              <p className="text-gray-600">Manage and view worker assignments for this week</p>
-            </div>
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition border-l-4 border-l-[#0066FF]">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
+                    Jam
+                  </th>
+                  {weekDates.map((w) => (
+                    <th key={w.day} className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
+                      {w.day}, {w.date}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                      Loading schedule...
+                    </td>
+                  </tr>
+                ) : (
+                  timeSlots.map((slot, i) => (
+                    <tr key={i} className="border-b border-gray-100 hover:bg-blue-50 transition">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900 border-r border-gray-200 bg-gray-50">
+                        {slot}
+                      </td>
+                      {weekDates.map((w, dIndex) => {
+                        const cellData = getScheduleCell(w.day, slot);
+                        if (cellData.length === 0)
+                          return (
+                            <td key={dIndex} className="px-4 py-3 text-sm text-gray-400 text-center">
+                              -
+                            </td>
+                          );
 
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition border-l-4 border-l-[#0066FF]">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200 bg-gray-50">
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Worker ID</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Name</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Actions</th>
+                        return (
+                          <td
+                            key={dIndex}
+                            className="px-4 py-3 text-sm text-gray-700 text-center align-top border-r border-gray-100"
+                          >
+                            {cellData.map((group, idx) => (
+                              <div
+                                key={idx}
+                                className="mb-2 rounded-lg bg-blue-100 border border-blue-300 p-2 text-left"
+                              >
+                                <div className="font-semibold text-blue-800 mb-1">
+                                  {group.supervisor_name}
+                                </div>
+                                {group.workers.map((w: any, i: number) => (
+                                  <div key={i} className="text-xs text-gray-700">
+                                    {w.jobdesc_name}: {w.worker_name}
+                                  </div>
+                                ))}
+                              </div>
+                            ))}
+
+                          </td>
+                        );
+                      })}
                     </tr>
-                  </thead>
-                  <tbody>
-                    {isLoading ? (
-                      <tr>
-                        <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
-                          Loading workers...
-                        </td>
-                      </tr>
-                    ) : workers.length > 0 ? (
-                      workers.map((worker, idx) => (
-                        <tr key={idx} className="border-b border-gray-200 hover:bg-blue-50 transition">
-                          <td className="px-6 py-4 text-sm font-medium text-gray-900">#{worker.id}</td>
-                          <td className="px-6 py-4 text-sm text-gray-700">{worker.name}</td>
-                          <td className="px-6 py-4 text-sm">
-                            <span
-                              className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                                worker.status === "Active" ? "bg-blue-100 text-[#0066FF]" : "bg-gray-100 text-gray-600"
-                              }`}
-                            >
-                              {worker.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-sm">
-                            <button className="text-[#0066FF] hover:text-[#0052cc] transition flex items-center gap-1 font-medium">
-                              View <ChevronRight size={16} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
-                          No workers found
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
 
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-                <p className="text-sm text-gray-600">Showing {workers.length} workers</p>
-                <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#E63946] hover:bg-[#d62828] transition text-white text-sm font-medium">
-                  See More <ChevronRight size={16} />
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <StatCard label="Total Workers" value={workers.length} />
-              <StatCard label="Active Today" value={workers.filter((w) => w.status === "Active").length} />
-              <StatCard label="On Leave" value={workers.filter((w) => w.status === "On Leave").length} />
-            </div>
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+            <p className="text-sm text-gray-600">
+              Showing {schedule.length} schedules
+            </p>
+            <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#E63946] hover:bg-[#d62828] transition text-white text-sm font-medium">
+              See More <ChevronRight size={16} />
+            </button>
           </div>
         </div>
-      </div>
+      </main>
     </div>
-  )
-}
-
-function StatCard({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6 hover:border-[#0066FF] hover:shadow-md transition">
-      <p className="text-sm text-gray-600 mb-2">{label}</p>
-      <p className="text-3xl font-bold text-[#0066FF]">{value}</p>
-    </div>
-  )
+  );
 }

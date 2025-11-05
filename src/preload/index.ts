@@ -14,6 +14,8 @@ if (process.contextIsolated) {
       getJobdesc: () => ipcRenderer.invoke("get-jobdesc"),
       getKetua: () => ipcRenderer.invoke("get-ketua"),
       addSchedule: (payload: any[]) => ipcRenderer.invoke("add-schedule", payload),
+      getSchedule: () => ipcRenderer.invoke("get-schedule"),
+
     });
 
     contextBridge.exposeInMainWorld('electron', electronAPI)

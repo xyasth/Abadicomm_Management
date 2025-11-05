@@ -6,9 +6,11 @@ declare global {
     api: unknown
     electronAPI: {
       getWorkers: () => Promise<any>;
-      getJobdesc: () => Promise<string[]>;
-      getKetua: () => Promise<string[]>;
+      getKetua: () => Promise<any>;
       addSchedule: (payload: any[]) => Promise<{ ok: boolean }>;
+      getJobdesc: () => Promise<any>;
+      getSchedule: () => Promise<any>;
+      // Tambah yang lain nanti
     };
   }
 }
