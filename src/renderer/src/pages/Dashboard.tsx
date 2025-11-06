@@ -119,9 +119,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-3xl font-bold mb-2 text-gray-900">Weekly Schedule</h2>
-            <p className="text-gray-600">
-              View and manage worker schedules from Google Sheets
-            </p>
+
           </div>
 
           <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#E63946] hover:bg-[#d62828] transition text-white font-semibold">

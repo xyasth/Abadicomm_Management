@@ -143,7 +143,7 @@ app.whenReady().then(() => {
   ipcMain.handle("get-schedule", async () => {
     const scheduleRows = await readSheet("Schedule!A3:G");
     const workerRows = await readSheet("Worker!A3:B");
-    const jobdescRows = await readSheet("Jobdesc!AB");
+    const jobdescRows = await readSheet("Jobdesc!A3:B");
 
     const workerMap = new Map(workerRows.map((r) => [r[0], r[1]]));
     const jobdescMap = new Map(jobdescRows.map((r) => [r[0], r[1]]));
