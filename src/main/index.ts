@@ -91,7 +91,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("get-workers", async () => {
-    const rows = await readSheet("Worker!A2:D");
+    const rows = await readSheet("Worker!A3:D");
 
     return rows.map(r => ({
       id: r[0] || "",
