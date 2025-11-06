@@ -3,7 +3,18 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { readSheet, appendSheet, getNextId } from "./googleSheets";
+import * as bcrypt from 'bcryptjs';
+import { google } from 'googleapis';
+import * as http from 'http';
+import * as url from 'url';
 
+const saltRounds = 10;
+
+const oauth2Client = new google.auth.OAuth2(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  process.env.GOOGLE_REDIRECT_URI
+);
 
 function formatTimestampParts(timestamp: string | number) {
   if (!timestamp) return { date: "", time: "" };
@@ -27,18 +38,147 @@ function formatTimestampParts(timestamp: string | number) {
   return { date: datePart, time: timePart };
 }
 
-// Helper function to check for time conflicts
 function checkTimeConflict(
   existingStart: number,
   existingEnd: number,
   newStart: number,
   newEnd: number
 ): boolean {
-  // Check if times overlap
-  // Conflict exists if:
-  // - New event starts before existing ends AND
-  // - New event ends after existing starts
   return newStart < existingEnd && newEnd > existingStart;
+}
+
+async function loginUser(name: string, password: string) {
+  const rows = await readSheet("Worker!A2:D");
+
+  const user = rows.find(row => {
+    const sheetName = row[1];
+    return sheetName === name;
+  });
+
+  if (!user) {
+    throw new Error('Invalid name or password.');
+  }
+
+  const storedHash = user[2];
+  const roleId = user[3];
+
+  const isMatch = await bcrypt.compare(password, storedHash);
+
+  if (isMatch) {
+    return {
+      success: true,
+      message: 'Login successful!',
+      role: roleId
+    };
+  } else {
+    throw new Error('Invalid name or password.');
+  }
+}
+
+async function registerUser(name: string, password: string, role: string) {
+  const rows = await readSheet("Worker!A2:B");
+  const names = rows.map(r => r[1]);
+  if (names.includes(name)) {
+    throw new Error('This name is already registered.');
+  }
+
+  const ids = rows
+    .map(r => Number(r[0]))
+    .filter(id => !isNaN(id));
+
+  let maxId = 0;
+  if (ids.length > 0) {
+    maxId = Math.max(...ids);
+  }
+
+  const newId = maxId + 1;
+
+  const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+  await appendSheet("Worker!A:D", [newId, name, hashedPassword, role]);
+
+  return { success: true, message: 'Registration successful!' };
+}
+
+async function startGoogleLoginFlow(): Promise<{ success: boolean, message: string, role: string }> {
+
+  // This function creates a Promise that will...
+  // 1. Start a local server
+  // 2. Open the browser
+  // 3. Wait for the server to get the callback code
+  // 4. Resolve with the code
+  const getAuthCode = (): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const server = http.createServer((req, res) => {
+        if (!req.url) {
+          return reject(new Error('Invalid request'));
+        }
+
+        const { code } = url.parse(req.url, true).query;
+
+        if (code) {
+          res.end('<h1>Success!</h1><p>You are logged in. You can close this window.</p>');
+          server.close();
+          resolve(code as string);
+        } else {
+          res.end('<h1>Error</h1><p>Something went wrong. Please try again.</p>');
+          server.close();
+          reject(new Error('No auth code found in callback.'));
+        }
+      });
+
+      server.listen(3000, () => {
+        // 1. Generate the Auth URL
+        const authUrl = oauth2Client.generateAuthUrl({
+          access_type: 'offline',
+          scope: [
+            'https://www.googleapis.com/auth/userinfo.profile',
+            'https://www.googleapis.com/auth/userinfo.email',
+          ],
+        });
+
+        // 2. Open the user's default browser
+        shell.openExternal(authUrl);
+      });
+    });
+  };
+
+  try {
+    // 3. Wait for the server to get the code
+    const code = await getAuthCode();
+
+    // 4. Exchange the code for tokens
+    const { tokens } = await oauth2Client.getToken(code);
+    oauth2Client.setCredentials(tokens);
+
+    // 5. Get the user's Google profile
+    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+    const userInfo = await oauth2.userinfo.get();
+
+    const userEmail = userInfo.data.email;
+    if (!userEmail) {
+      throw new Error('Could not get email from Google.');
+    }
+
+    // 6. Check if this email exists in your Worker sheet
+    // We assume Email is in Column E
+    const rows = await readSheet("Worker!A2:E");
+    const user = rows.find(row => row[4] === userEmail); // row[4] is Column E
+
+    if (user) {
+      const roleId = user[3]; // Column D
+      return {
+        success: true,
+        message: 'Login successful!',
+        role: roleId
+      };
+    } else {
+      throw new Error('This Google account is not registered as a worker.');
+    }
+  } catch (error: any) {
+    console.error('Google login flow error:', error);
+    throw new Error(error.message || 'Google login failed.');
+  }
 }
 
 function createWindow(): void {
@@ -76,6 +216,18 @@ app.whenReady().then(() => {
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
+
+  ipcMain.handle("login-user", (event, name, password) => {
+    return loginUser(name, password);
+  });
+
+  ipcMain.handle("register-user", (event, name, password, role) => {
+    return registerUser(name, password, role);
+  });
+
+  ipcMain.handle("google-login-start", () => {
+    return startGoogleLoginFlow();
+  });
 
   ipcMain.on('ping', () => console.log('pong'))
 
@@ -172,12 +324,13 @@ app.whenReady().then(() => {
       console.log("Next worker ID:", nextId);
 
       const defaultPassword = "12121212";
+      const hashedPassword = await bcrypt.hash(defaultPassword, saltRounds);
       const roleId = "1";
 
       await appendSheet("Worker", [
         nextId.toString(),
         supervisorName,
-        defaultPassword,
+        hashedPassword,
         roleId
       ]);
       console.log("Supervisor added successfully");
@@ -201,7 +354,6 @@ app.whenReady().then(() => {
     try {
       console.log("Adding schedule:", payload);
 
-      // IMPORTANT: Convert to WIB (Asia/Jakarta, GMT+7) timezone
       const [year, month, day] = payload.date.split('-').map(Number);
       const [startHour, startMinute] = payload.startTime.split(':').map(Number);
       const [endHour, endMinute] = payload.endTime.split(':').map(Number);
@@ -220,7 +372,6 @@ app.whenReady().then(() => {
       console.log("Verification - Start:", new Date(startTimestamp * 1000).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }));
       console.log("Verification - End:", new Date(endTimestamp * 1000).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }));
 
-      // Check for time conflicts with existing schedules
       const existingSchedules = await readSheet("Schedule!A3:G");
 
       for (const schedule of existingSchedules) {
@@ -229,14 +380,9 @@ app.whenReady().then(() => {
         const scheduleStart = parseInt(schedule[1]);
         const scheduleEnd = parseInt(schedule[2]);
 
-        // Check if same worker OR same supervisor
         if (scheduleWorkerId === payload.workerId || scheduleSupervisorId === payload.supervisorId) {
-          // Check if times conflict
           if (checkTimeConflict(scheduleStart, scheduleEnd, startTimestamp, endTimestamp)) {
-            // Determine which person has the conflict
             const conflictPerson = scheduleWorkerId === payload.workerId ? "Worker" : "Supervisor";
-
-            // Get the conflicting schedule details
             const conflictStart = new Date(scheduleStart * 1000);
             const conflictEnd = new Date(scheduleEnd * 1000);
 
@@ -272,7 +418,6 @@ app.whenReady().then(() => {
       const nextId = await getNextId("Schedule!A3:A");
       console.log("Next schedule ID:", nextId);
 
-      // Format: [Id, Waktu Mulai, Waktu Selesai, Worker_id, Jobdesc_id, Supervisor_id, Tempat]
       const row = [
         nextId.toString(),
         startTimestamp.toString(),
@@ -305,4 +450,3 @@ app.on('window-all-closed', () => {
     app.quit()
   }
 })
-
