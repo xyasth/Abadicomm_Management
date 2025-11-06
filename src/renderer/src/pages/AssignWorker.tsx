@@ -43,9 +43,7 @@ export default function AssignWorker() {
   ])
 
   const [showJobdescModal, setShowJobdescModal] = useState(false)
-  const [showSupervisorModal, setShowSupervisorModal] = useState(false)
   const [newJobdesc, setNewJobdesc] = useState("")
-  const [newSupervisor, setNewSupervisor] = useState("")
 
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -61,6 +59,13 @@ export default function AssignWorker() {
     loadJobdesc();
     loadSupervisors();
   }, [])
+
+  // Cleanup modal states when they close
+  useEffect(() => {
+    if (!showJobdescModal) {
+      setNewJobdesc("");
+    }
+  }, [showJobdescModal])
 
   // Auto-hide toast after 3 seconds
   useEffect(() => {
@@ -184,6 +189,12 @@ export default function AssignWorker() {
           setNewJobdesc("");
           setShowJobdescModal(false);
           showToast("Job description added successfully!", "success");
+          // Force re-render to ensure inputs are working
+          setTimeout(() => {
+            const firstInput = document.querySelector('input[type="date"]') as HTMLInputElement;
+            firstInput?.focus();
+            firstInput?.blur();
+          }, 100);
         } else {
           showToast("Failed to add job description", "error");
         }
@@ -191,36 +202,6 @@ export default function AssignWorker() {
     } catch (error) {
       console.error("Error adding jobdesc:", error);
       showToast("Error adding job description", "error");
-    }
-  }
-
-  const handleAddSupervisor = async () => {
-    if (!newSupervisor.trim()) {
-      showToast("Please enter a supervisor name", "error");
-      return;
-    }
-
-    if (supervisorOptions.some(s => s.name.toLowerCase() === newSupervisor.trim().toLowerCase())) {
-      showToast("This supervisor already exists", "error");
-      return;
-    }
-
-    try {
-      if (window.electronAPI?.addSupervisor) {
-        const result = await window.electronAPI.addSupervisor(newSupervisor.trim());
-
-        if (result.ok && result.id && result.name) {
-          setSupervisorOptions([...supervisorOptions, { id: result.id.toString(), name: result.name }]);
-          setNewSupervisor("");
-          setShowSupervisorModal(false);
-          showToast("Supervisor added successfully!", "success");
-        } else {
-          showToast("Failed to add supervisor", "error");
-        }
-      }
-    } catch (error) {
-      console.error("Error adding supervisor:", error);
-      showToast("Error adding supervisor", "error");
     }
   }
 
@@ -470,16 +451,7 @@ export default function AssignWorker() {
                   </label>
 
                   <label className="block">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm font-medium text-gray-700">Supervisor</span>
-                      <button
-                        type="button"
-                        onClick={() => setShowSupervisorModal(true)}
-                        className="flex items-center gap-1 px-2 py-1 bg-yellow-400 hover:bg-yellow-500 text-gray-900 rounded-md transition text-xs font-medium"
-                      >
-                        <Plus size={14} />
-                      </button>
-                    </div>
+                    <span className="text-sm font-medium text-gray-700 mb-1.5 block">Supervisor</span>
                     <select
                       value={assignment.supervisorId}
                       onChange={(e) => updateAssignment(assignment.id, "supervisor", e.target.value)}
@@ -517,7 +489,15 @@ export default function AssignWorker() {
 
       {/* Jobdesc Modal */}
       {showJobdescModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowJobdescModal(false);
+              setNewJobdesc("");
+            }
+          }}
+        >
           <div className="bg-white rounded-xl p-6 w-96 shadow-2xl">
             <h3 className="text-xl font-bold text-gray-900 mb-4">Add New Job Description</h3>
             <input
@@ -531,7 +511,12 @@ export default function AssignWorker() {
                   e.preventDefault();
                   handleAddJobdesc();
                 }
+                if (e.key === 'Escape') {
+                  setShowJobdescModal(false);
+                  setNewJobdesc("");
+                }
               }}
+              autoFocus
             />
             <div className="flex gap-3 justify-end">
               <button
@@ -547,47 +532,6 @@ export default function AssignWorker() {
               <button
                 type="button"
                 onClick={handleAddJobdesc}
-                className="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-medium rounded-lg transition"
-              >
-                Add
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Supervisor Modal */}
-      {showSupervisorModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-96 shadow-2xl">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Add New Supervisor</h3>
-            <input
-              type="text"
-              value={newSupervisor}
-              onChange={(e) => setNewSupervisor(e.target.value)}
-              placeholder="Enter supervisor name"
-              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none mb-4"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleAddSupervisor();
-                }
-              }}
-            />
-            <div className="flex gap-3 justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowSupervisorModal(false)
-                  setNewSupervisor("")
-                }}
-                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleAddSupervisor}
                 className="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-medium rounded-lg transition"
               >
                 Add
