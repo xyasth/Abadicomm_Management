@@ -11,8 +11,8 @@ declare global {
       addSchedule: (payload: any[]) => Promise<{ ok: boolean }>;
       getJobdesc: () => Promise<any>;
       getSchedule: () => Promise<any>;
-      register: (name: string, password: string, role: string) => Promise<any>; // Added 'role'
-      login: (name: string, password: string) => Promise<any>;
+      register: (name: string, password: string, role: string) => Promise<any>;
+      login: (name: string, password: string) => Promise<{success: boolean, message: string, role: string}>;
       addSchedule: (payload: {
         workerId: string;
         jobdescId: string;
