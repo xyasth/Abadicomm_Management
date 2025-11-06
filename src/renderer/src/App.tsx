@@ -71,8 +71,6 @@ function App(): React.JSX.Element {
             >
               Dashboard
             </button>
-
-            {currentUserRole === '3' && (
               <button
                 onClick={() => setCurrentPage("assign")}
                 className={`text-sm font-medium transition ${
@@ -83,7 +81,6 @@ function App(): React.JSX.Element {
               >
                 Assign Worker
               </button>
-            )}
 
             <button
               onClick={() => setCurrentPage("jadwal")}

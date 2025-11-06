@@ -8,14 +8,9 @@ if (process.contextIsolated) {
     contextBridge.exposeInMainWorld("electronAPI", {
       getWorkers: () => ipcRenderer.invoke("get-workers"),
       getJobdesc: () => ipcRenderer.invoke("get-jobdesc"),
-      getKetua: () => ipcRenderer.invoke("get-ketua"),
       getSchedule: () => ipcRenderer.invoke("get-schedule"),
       getWorkersId: () => ipcRenderer.invoke("get-workers-id"),
-      register: (name: string, password: string, role: string) =>
-        ipcRenderer.invoke("register-user", name, password, role),
-
-      login: (name: string, password: string) =>
-        ipcRenderer.invoke("login-user", name, password),
+      getKetua: () => ipcRenderer.invoke("get-ketua"),
       addSchedule: (payload: any) => ipcRenderer.invoke("add-schedule", payload),
       addJobdesc: (name: string) => ipcRenderer.invoke("add-jobdesc", name),
       addSupervisor: (name: string) => ipcRenderer.invoke("add-supervisor", name),

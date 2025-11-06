@@ -314,22 +314,18 @@ export default function Jadwal() {
         message={alertMessage}
         onClose={() => setAlertMessage("")}
       />
-      <nav className="flex items-center justify-between bg-white border-b border-gray-200 px-8 py-4 shadow-sm">
-        <div className="flex items-center gap-6">
-          <a
-            href="#"
-            className="text-sm text-gray-700 hover:text-blue-600 font-medium"
-          >
-            Schedule
-          </a>
-          <a
-            href="#"
-            className="text-sm text-gray-700 hover:text-blue-600 font-medium"
-          >
-            Workers
-          </a>
+
+      <main className="p-8 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+          <h2 className="text-3xl font-bold mb-2 text-gray-900">
+            Weekly Schedule
+          </h2>
+          <p className="text-gray-600">
+            View and manage worker schedules from Google Sheets
+          </p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#E63946] hover:bg-[#d62828] transition text-white font-semibold">
+          <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#E63946] hover:bg-[#d62828] transition text-white font-semibold">
           {/* 🔹 GANTI <Plus /> dengan SVG inline 🔹 */}
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -347,17 +343,8 @@ export default function Jadwal() {
           </svg>
           Add Schedule
         </button>
-      </nav>
-
-      <main className="p-8 space-y-6">
-        <div>
-          <h2 className="text-3xl font-bold mb-2 text-gray-900">
-            Weekly Schedule
-          </h2>
-          <p className="text-gray-600">
-            View and manage worker schedules from Google Sheets
-          </p>
         </div>
+
 
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition">
           <div className="overflow-auto max-h-[80vh]">

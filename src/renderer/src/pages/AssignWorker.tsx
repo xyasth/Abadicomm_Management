@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Plus, X } from "lucide-react"
+import { Plus, X, CheckCircle, XCircle } from "lucide-react"
 
 interface Worker {
   id: string;
@@ -42,21 +42,39 @@ export default function AssignWorker() {
     { id: "1", workerId: "", workerName: "", jobdescId: "", jobdescName: "", supervisorId: "", supervisorName: "" }
   ])
 
-  // Modal states
   const [showJobdescModal, setShowJobdescModal] = useState(false)
   const [showSupervisorModal, setShowSupervisorModal] = useState(false)
   const [newJobdesc, setNewJobdesc] = useState("")
   const [newSupervisor, setNewSupervisor] = useState("")
 
-  // Loading states
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Load data on mount
+  // Toast notification state
+  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({
+    show: false,
+    message: '',
+    type: 'success'
+  })
+
   useEffect(() => {
     loadWorkers();
     loadJobdesc();
     loadSupervisors();
   }, [])
+
+  // Auto-hide toast after 3 seconds
+  useEffect(() => {
+    if (toast.show) {
+      const timer = setTimeout(() => {
+        setToast({ ...toast, show: false })
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [toast.show])
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ show: true, message, type })
+  }
 
   const loadWorkers = async () => {
     if (window.electronAPI?.getWorkersId) {
@@ -76,10 +94,6 @@ export default function AssignWorker() {
         setJobdescOptions(data)
       } catch (error) {
         console.error("Failed to load jobdesc:", error)
-        setJobdescOptions([
-          { id: "1", name: "Sound System" },
-          { id: "2", name: "Lighting" }
-        ])
       }
     }
   }
@@ -91,10 +105,6 @@ export default function AssignWorker() {
         setSupervisorOptions(data)
       } catch (error) {
         console.error("Failed to load supervisors:", error)
-        setSupervisorOptions([
-          { id: "1", name: "Ahmad" },
-          { id: "2", name: "Budi" }
-        ])
       }
     }
   }
@@ -126,7 +136,6 @@ export default function AssignWorker() {
 
       const updated = { ...a };
 
-      // Update worker
       if (field === "worker") {
         const worker = workers.find(w => w.id === value);
         if (worker) {
@@ -135,7 +144,6 @@ export default function AssignWorker() {
         }
       }
 
-      // Update jobdesc
       if (field === "jobdesc") {
         const jobdesc = jobdescOptions.find(j => j.id === value);
         if (jobdesc) {
@@ -144,7 +152,6 @@ export default function AssignWorker() {
         }
       }
 
-      // Update supervisor
       if (field === "supervisor") {
         const supervisor = supervisorOptions.find(s => s.id === value);
         if (supervisor) {
@@ -159,13 +166,12 @@ export default function AssignWorker() {
 
   const handleAddJobdesc = async () => {
     if (!newJobdesc.trim()) {
-      alert("Please enter a job description name");
+      showToast("Please enter a job description name", "error");
       return;
     }
 
-    // Check if already exists
     if (jobdescOptions.some(j => j.name.toLowerCase() === newJobdesc.trim().toLowerCase())) {
-      alert("This job description already exists");
+      showToast("This job description already exists", "error");
       return;
     }
 
@@ -174,30 +180,28 @@ export default function AssignWorker() {
         const result = await window.electronAPI.addJobdesc(newJobdesc.trim());
 
         if (result.ok && result.id && result.name) {
-          // Add to local state
           setJobdescOptions([...jobdescOptions, { id: result.id.toString(), name: result.name }]);
           setNewJobdesc("");
           setShowJobdescModal(false);
-          alert("Job description added successfully!");
+          showToast("Job description added successfully!", "success");
         } else {
-          alert("Failed to add job description");
+          showToast("Failed to add job description", "error");
         }
       }
     } catch (error) {
       console.error("Error adding jobdesc:", error);
-      alert("Error adding job description");
+      showToast("Error adding job description", "error");
     }
   }
 
   const handleAddSupervisor = async () => {
     if (!newSupervisor.trim()) {
-      alert("Please enter a supervisor name");
+      showToast("Please enter a supervisor name", "error");
       return;
     }
 
-    // Check if already exists
     if (supervisorOptions.some(s => s.name.toLowerCase() === newSupervisor.trim().toLowerCase())) {
-      alert("This supervisor already exists");
+      showToast("This supervisor already exists", "error");
       return;
     }
 
@@ -206,27 +210,25 @@ export default function AssignWorker() {
         const result = await window.electronAPI.addSupervisor(newSupervisor.trim());
 
         if (result.ok && result.id && result.name) {
-          // Add to local state
           setSupervisorOptions([...supervisorOptions, { id: result.id.toString(), name: result.name }]);
           setNewSupervisor("");
           setShowSupervisorModal(false);
-          alert("Supervisor added successfully!");
+          showToast("Supervisor added successfully!", "success");
         } else {
-          alert("Failed to add supervisor");
+          showToast("Failed to add supervisor", "error");
         }
       }
     } catch (error) {
       console.error("Error adding supervisor:", error);
-      alert("Error adding supervisor");
+      showToast("Error adding supervisor", "error");
     }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validation
     if (!date || !location || !startTime || !endTime) {
-      alert("Please fill in all event details");
+      showToast("Please fill in all event details", "error");
       return;
     }
 
@@ -235,11 +237,10 @@ export default function AssignWorker() {
     )
 
     if (invalidAssignments.length > 0) {
-      alert("Please fill in all worker assignments (Worker, Jobdesc, and Supervisor)")
+      showToast("Please fill in all worker assignments", "error");
       return
     }
 
-    // Check for duplicate workers
     const workerIds = assignments.map(a => a.workerId)
     const duplicates = workerIds.filter((id, index) => workerIds.indexOf(id) !== index)
 
@@ -247,20 +248,18 @@ export default function AssignWorker() {
       const duplicateNames = assignments
         .filter(a => duplicates.includes(a.workerId))
         .map(a => a.workerName)
-      alert(`Duplicate workers found: ${[...new Set(duplicateNames)].join(", ")}. Each worker can only be assigned once per event.`)
+      showToast(`Duplicate workers: ${[...new Set(duplicateNames)].join(", ")}`, "error");
       return
     }
 
-    // Time validation
     if (startTime >= endTime) {
-      alert("End time must be after start time");
+      showToast("End time must be after start time", "error");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      // Submit all assignments
       const results = await Promise.all(
         assignments.map(async (assignment) => {
           const payload = {
@@ -280,7 +279,7 @@ export default function AssignWorker() {
               workerName: assignment.workerName
             };
           }
-          return { ok: false, workerName: assignment.workerName };
+          return { ok: false, workerName: assignment.workerName, error: 'Unknown error' };
         })
       );
 
@@ -288,9 +287,8 @@ export default function AssignWorker() {
       const failedResults = results.filter(r => !r.ok);
 
       if (successCount === assignments.length) {
-        alert(`Successfully assigned ${assignments.length} worker(s)!`);
+        showToast(`Successfully assigned ${assignments.length} worker(s)!`, "success");
 
-        // Reset form
         setDate("");
         setLocation("");
         setStartTime("");
@@ -305,21 +303,19 @@ export default function AssignWorker() {
           supervisorName: ""
         }]);
       } else if (successCount > 0) {
-        // Show which workers had conflicts
         const errorMessages = failedResults
           .map(r => `${r.workerName}: ${r.error || 'Unknown error'}`)
-          .join('\n\n');
-        alert(`Partially successful: ${successCount} out of ${assignments.length} workers assigned.\n\nErrors:\n${errorMessages}`);
+          .join(', ');
+        showToast(`Partial success: ${successCount}/${assignments.length}. Errors: ${errorMessages}`, "error");
       } else {
-        // All failed
         const errorMessages = failedResults
-          .map(r => `${r.workerName}: ${r.error || 'Unknown error'}`)
-          .join('\n\n');
-        alert(`Failed to assign workers:\n\n${errorMessages}`);
+          .map(r => r.error || 'Unknown error')
+          .join(', ');
+        showToast(`Failed: ${errorMessages}`, "error");
       }
     } catch (error) {
       console.error("Error assigning workers:", error);
-      alert("Failed to assign workers. Please try again.");
+      showToast("Failed to assign workers", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -327,6 +323,18 @@ export default function AssignWorker() {
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className="fixed top-4 right-4 z-50 animate-slideIn">
+          <div className={`flex items-center gap-3 px-6 py-4 rounded-lg shadow-lg ${
+            toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'
+          } text-white`}>
+            {toast.type === 'success' ? <CheckCircle size={24} /> : <XCircle size={24} />}
+            <span className="font-medium">{toast.message}</span>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-4xl mx-auto p-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Assign Worker</h1>
@@ -334,7 +342,6 @@ export default function AssignWorker() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Event Details */}
           <div className="bg-white border-2 border-gray-200 rounded-xl p-6 space-y-4">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Event Details</h3>
             <div className="grid grid-cols-2 gap-4">
@@ -363,7 +370,6 @@ export default function AssignWorker() {
             </div>
           </div>
 
-          {/* Event Time */}
           <div className="bg-white border-2 border-gray-200 rounded-xl p-6 space-y-4">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Event Time</h3>
             <div className="grid grid-cols-2 gap-4">
@@ -391,7 +397,6 @@ export default function AssignWorker() {
             </div>
           </div>
 
-          {/* Worker Assignments */}
           <div className="bg-white border-2 border-gray-200 rounded-xl p-6 space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-800">Worker Assignments</h3>
@@ -421,7 +426,6 @@ export default function AssignWorker() {
                 </div>
 
                 <div className="space-y-3">
-                  {/* Worker Dropdown */}
                   <label className="block">
                     <span className="text-sm font-medium text-gray-700 mb-1.5 block">Worker</span>
                     <select
@@ -439,7 +443,6 @@ export default function AssignWorker() {
                     </select>
                   </label>
 
-                  {/* Jobdesc Dropdown with + button */}
                   <label className="block">
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-sm font-medium text-gray-700">Jobdesc</span>
@@ -466,7 +469,6 @@ export default function AssignWorker() {
                     </select>
                   </label>
 
-                  {/* Supervisor Dropdown with + button */}
                   <label className="block">
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-sm font-medium text-gray-700">Supervisor</span>
@@ -497,7 +499,6 @@ export default function AssignWorker() {
             ))}
           </div>
 
-          {/* Submit Button */}
           <div className="flex justify-center pt-4">
             <button
               type="submit"
@@ -514,7 +515,7 @@ export default function AssignWorker() {
         </form>
       </div>
 
-      {/* Add Jobdesc Modal */}
+      {/* Jobdesc Modal */}
       {showJobdescModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-96 shadow-2xl">
@@ -525,8 +526,12 @@ export default function AssignWorker() {
               onChange={(e) => setNewJobdesc(e.target.value)}
               placeholder="Enter job description"
               className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none mb-4"
-              onKeyPress={(e) => e.key === 'Enter' && handleAddJobdesc()}
-              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddJobdesc();
+                }
+              }}
             />
             <div className="flex gap-3 justify-end">
               <button
@@ -551,7 +556,7 @@ export default function AssignWorker() {
         </div>
       )}
 
-      {/* Add Supervisor Modal */}
+      {/* Supervisor Modal */}
       {showSupervisorModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-96 shadow-2xl">
@@ -562,8 +567,12 @@ export default function AssignWorker() {
               onChange={(e) => setNewSupervisor(e.target.value)}
               placeholder="Enter supervisor name"
               className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none mb-4"
-              onKeyPress={(e) => e.key === 'Enter' && handleAddSupervisor()}
-              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddSupervisor();
+                }
+              }}
             />
             <div className="flex gap-3 justify-end">
               <button
@@ -587,6 +596,22 @@ export default function AssignWorker() {
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes slideIn {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        .animate-slideIn {
+          animation: slideIn 0.3s ease-out;
+        }
+      `}</style>
     </div>
   )
 }
