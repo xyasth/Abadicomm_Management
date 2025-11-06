@@ -412,7 +412,7 @@ export default function AssignWorker() {
                     <select
                       value={assignment.workerId}
                       onChange={(e) => updateAssignment(assignment.id, "worker", e.target.value)}
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-yellow-50 font-medium"
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-blue-50 font-medium"
                       required
                     >
                       <option value="">Select Worker</option>
@@ -430,15 +430,15 @@ export default function AssignWorker() {
                       <button
                         type="button"
                         onClick={() => setShowJobdescModal(true)}
-                        className="flex items-center gap-1 px-2 py-1 bg-yellow-400 hover:bg-yellow-500 text-gray-900 rounded-md transition text-xs font-medium"
+                        className="flex items-center gap-1 px-2 py-1 bg-blue-400 hover:bg-blue-500 text-gray-900 rounded-md transition text-xs font-medium"
                       >
-                        <Plus size={14} />
+                        <Plus size={14} color="white"/>
                       </button>
                     </div>
                     <select
                       value={assignment.jobdescId}
                       onChange={(e) => updateAssignment(assignment.id, "jobdesc", e.target.value)}
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-yellow-50 font-medium"
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-blue-50 font-medium"
                       required
                     >
                       <option value="">Select Job Description</option>
@@ -455,7 +455,7 @@ export default function AssignWorker() {
                     <select
                       value={assignment.supervisorId}
                       onChange={(e) => updateAssignment(assignment.id, "supervisor", e.target.value)}
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-yellow-50 font-medium"
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-blue-50 font-medium"
                       required
                     >
                       <option value="">Select Supervisor</option>
@@ -472,17 +472,17 @@ export default function AssignWorker() {
           </div>
 
           <div className="flex justify-center pt-4">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className={`px-8 py-3 font-bold rounded-lg transition shadow-md hover:shadow-lg text-lg ${
-                isSubmitting
-                  ? "bg-gray-400 text-gray-700 cursor-not-allowed"
-                  : "bg-yellow-400 hover:bg-yellow-500 text-gray-900"
-              }`}
-            >
-              {isSubmitting ? "Submitting..." : "Confirm Assignment"}
-            </button>
+                <button
+                type="submit"
+                disabled={isSubmitting}
+                className={`px-8 py-3 font-bold rounded-lg transition shadow-md hover:shadow-lg text-lg ${
+                  isSubmitting
+                    ? "bg-gray-400 text-gray-700 cursor-not-allowed"
+                    : "bg-blue-500 hover:bg-blue-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-300"
+                }`}
+              >
+                {isSubmitting ? "Submitting..." : "Confirm Assignment"}
+              </button>
           </div>
         </form>
       </div>
@@ -532,7 +532,7 @@ export default function AssignWorker() {
               <button
                 type="button"
                 onClick={handleAddJobdesc}
-                className="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-medium rounded-lg transition"
+                className="px-4 py-2 bg-blue-400 hover:bg-blue-500 text-gray-900 font-medium rounded-lg transition"
               >
                 Add
               </button>
