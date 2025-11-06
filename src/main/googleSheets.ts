@@ -10,19 +10,52 @@ const auth = new google.auth.GoogleAuth({
 });
 
 const sheets = google.sheets({ version: "v4", auth });
+const spreadsheetId = '1sWQTqJuOc7K5LHxzsLHZZHV3Wdag7TAWfCLt1aOxYno';
 
 export async function readSheet(range: string) {
-  const spreadsheetId = '1sWQTqJuOc7K5LHxzsLHZZHV3Wdag7TAWfCLt1aOxYno';
   const res = await sheets.spreadsheets.values.get({ spreadsheetId, range });
   return res.data.values || [];
 }
 
 export async function appendSheet(range: string, row: any[]) {
-  const spreadsheetId = '1sWQTqJuOc7K5LHxzsLHZZHV3Wdag7TAWfCLt1aOxYno';
+  try {
+    console.log(`Appending to ${range}:`, row);
+
+    // If range doesn't include cell references, append !A:Z to it
+    const fullRange = range.includes('!') ? range : `${range}!A:Z`;
+
+    const result = await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: fullRange,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [row] },
+    });
+
+    console.log(`Append successful:`, result.data.updates);
+    return result;
+  } catch (error) {
+    console.error(`Error appending to ${range}:`, error);
+    throw error;
+  }
+}
+
+// New function to get the next ID for a table
+export async function getNextId(range: string): Promise<number> {
+  const rows = await readSheet(range);
+  if (rows.length === 0) return 1;
+
+  const ids = rows.map(r => parseInt(r[0] || "0")).filter(id => !isNaN(id));
+  return ids.length > 0 ? Math.max(...ids) + 1 : 1;
+}
+
+// New function to batch append multiple rows
+export async function batchAppendSheet(range: string, rows: any[][]) {
+  if (rows.length === 0) return;
+
   await sheets.spreadsheets.values.append({
     spreadsheetId,
     range,
     valueInputOption: "USER_ENTERED",
-    requestBody: { values: [row] },
+    requestBody: { values: rows },
   });
 }

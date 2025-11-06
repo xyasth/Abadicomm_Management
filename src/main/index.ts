@@ -2,7 +2,8 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { readSheet, appendSheet } from "./googleSheets";
+import { readSheet, appendSheet, getNextId } from "./googleSheets";
+
 
 function formatTimestampParts(timestamp: string | number) {
   if (!timestamp) return { date: "", time: "" };
@@ -26,9 +27,21 @@ function formatTimestampParts(timestamp: string | number) {
   return { date: datePart, time: timePart };
 }
 
+// Helper function to check for time conflicts
+function checkTimeConflict(
+  existingStart: number,
+  existingEnd: number,
+  newStart: number,
+  newEnd: number
+): boolean {
+  // Check if times overlap
+  // Conflict exists if:
+  // - New event starts before existing ends AND
+  // - New event ends after existing starts
+  return newStart < existingEnd && newEnd > existingStart;
+}
 
 function createWindow(): void {
-  // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
@@ -50,8 +63,6 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -59,42 +70,45 @@ function createWindow(): void {
   }
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
-  // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // IPC test
   ipcMain.on('ping', () => console.log('pong'))
+
+  ipcMain.handle("get-workers-id", async () => {
+    const rows = await readSheet("Worker!A3:D");
+    return rows
+    .filter(r => r[3] === "2")
+    .map(r => ({
+      id: r[0] || "",
+      name: r[1] || "",
+      password: r[2] || "",
+    }));
+  });
+
   ipcMain.handle("get-workers", async () => {
-    const rows = await readSheet("Worker!A2:C");
+    const rows = await readSheet("Worker!A2:D");
 
     return rows.map(r => ({
       id: r[0] || "",
       name: r[1] || "",
-      password: r[2] || "", // sesuai sheet kamu
+      password: r[2] || "",
+      role_id: r[3] || "",
     }));
   });
 
   ipcMain.handle("get-schedule", async () => {
     const scheduleRows = await readSheet("Schedule!A3:G");
-    const workerRows = await readSheet("Worker!A3:B");         // [id, name]
-    const jobdescRows = await readSheet("Jobdesc!A3:B");        // [id, name]
+    const workerRows = await readSheet("Worker!A3:B");
+    const jobdescRows = await readSheet("Jobdesc!A3:B");
 
-    // buat map untuk lookup cepat
     const workerMap = new Map(workerRows.map((r) => [r[0], r[1]]));
     const jobdescMap = new Map(jobdescRows.map((r) => [r[0], r[1]]));
 
-    // gabungkan data
     const schedules = scheduleRows.map((r) => {
       const start = formatTimestampParts(r[1]);
       const end = formatTimestampParts(r[2]);
@@ -116,34 +130,179 @@ app.whenReady().then(() => {
     return schedules;
   });
 
+  ipcMain.handle("get-jobdesc", async () => {
+    const rows = await readSheet("Jobdesc!A3:B");
+    return rows.map(r => ({
+      id: r[0] || "",
+      name: r[1] || ""
+    })).filter(v => v.name);
+  });
 
+  ipcMain.handle("get-ketua", async () => {
+    const rows = await readSheet("Worker!A3:D");
+    return rows
+      .filter(r => r[3] === "1")
+      .map(r => ({
+        id: r[0] || "",
+        name: r[1] || ""
+      }))
+      .filter(v => v.name);
+  });
+
+  ipcMain.handle("add-jobdesc", async (_, jobdescName: string) => {
+    try {
+      console.log("Adding jobdesc:", jobdescName);
+      const nextId = await getNextId("Jobdesc!A3:A");
+      console.log("Next jobdesc ID:", nextId);
+
+      await appendSheet("Jobdesc", [nextId.toString(), jobdescName]);
+      console.log("Jobdesc added successfully");
+
+      return { ok: true, id: nextId, name: jobdescName };
+    } catch (error) {
+      console.error("Error adding jobdesc:", error);
+      return { ok: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle("add-supervisor", async (_, supervisorName: string) => {
+    try {
+      console.log("Adding supervisor:", supervisorName);
+      const nextId = await getNextId("Worker!A3:A");
+      console.log("Next worker ID:", nextId);
+
+      const defaultPassword = "12121212";
+      const roleId = "1";
+
+      await appendSheet("Worker", [
+        nextId.toString(),
+        supervisorName,
+        defaultPassword,
+        roleId
+      ]);
+      console.log("Supervisor added successfully");
+
+      return { ok: true, id: nextId, name: supervisorName };
+    } catch (error) {
+      console.error("Error adding supervisor:", error);
+      return { ok: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle("add-schedule", async (_, payload: {
+    workerId: string;
+    jobdescId: string;
+    supervisorId: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    location: string;
+  }) => {
+    try {
+      console.log("Adding schedule:", payload);
+
+      // IMPORTANT: Convert to WIB (Asia/Jakarta, GMT+7) timezone
+      const [year, month, day] = payload.date.split('-').map(Number);
+      const [startHour, startMinute] = payload.startTime.split(':').map(Number);
+      const [endHour, endMinute] = payload.endTime.split(':').map(Number);
+
+      const WIB_OFFSET = 7 * 60 * 60 * 1000;
+
+      const startDateUTC = Date.UTC(year, month - 1, day, startHour, startMinute, 0);
+      const endDateUTC = Date.UTC(year, month - 1, day, endHour, endMinute, 0);
+
+      const startTimestamp = Math.floor((startDateUTC - WIB_OFFSET) / 1000);
+      const endTimestamp = Math.floor((endDateUTC - WIB_OFFSET) / 1000);
+
+      console.log("Input date/time:", `${payload.date} ${payload.startTime} - ${payload.endTime}`);
+      console.log("Start Timestamp (WIB):", startTimestamp);
+      console.log("End Timestamp (WIB):", endTimestamp);
+      console.log("Verification - Start:", new Date(startTimestamp * 1000).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }));
+      console.log("Verification - End:", new Date(endTimestamp * 1000).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }));
+
+      // Check for time conflicts with existing schedules
+      const existingSchedules = await readSheet("Schedule!A3:G");
+
+      for (const schedule of existingSchedules) {
+        const scheduleWorkerId = schedule[3];
+        const scheduleSupervisorId = schedule[5];
+        const scheduleStart = parseInt(schedule[1]);
+        const scheduleEnd = parseInt(schedule[2]);
+
+        // Check if same worker OR same supervisor
+        if (scheduleWorkerId === payload.workerId || scheduleSupervisorId === payload.supervisorId) {
+          // Check if times conflict
+          if (checkTimeConflict(scheduleStart, scheduleEnd, startTimestamp, endTimestamp)) {
+            // Determine which person has the conflict
+            const conflictPerson = scheduleWorkerId === payload.workerId ? "Worker" : "Supervisor";
+
+            // Get the conflicting schedule details
+            const conflictStart = new Date(scheduleStart * 1000);
+            const conflictEnd = new Date(scheduleEnd * 1000);
+
+            const conflictDate = conflictStart.toLocaleDateString("id-ID", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+              timeZone: "Asia/Jakarta",
+            });
+
+            const conflictStartTime = conflictStart.toLocaleTimeString("id-ID", {
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+              timeZone: "Asia/Jakarta",
+            });
+
+            const conflictEndTime = conflictEnd.toLocaleTimeString("id-ID", {
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+              timeZone: "Asia/Jakarta",
+            });
+
+            return {
+              ok: false,
+              error: `Konflik waktu! ${conflictPerson} sudah ada jadwal pada ${conflictDate} dari ${conflictStartTime} sampai ${conflictEndTime} WIB`
+            };
+          }
+        }
+      }
+
+      const nextId = await getNextId("Schedule!A3:A");
+      console.log("Next schedule ID:", nextId);
+
+      // Format: [Id, Waktu Mulai, Waktu Selesai, Worker_id, Jobdesc_id, Supervisor_id, Tempat]
+      const row = [
+        nextId.toString(),
+        startTimestamp.toString(),
+        endTimestamp.toString(),
+        payload.workerId,
+        payload.jobdescId,
+        payload.supervisorId,
+        payload.location
+      ];
+
+      await appendSheet("Schedule", row);
+      console.log("Schedule added successfully");
+
+      return { ok: true, id: nextId };
+    } catch (error) {
+      console.error("Error adding schedule:", error);
+      return { ok: false, error: String(error) };
+    }
+  });
 
   createWindow()
 
   app.on('activate', function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
 })
 
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.
-ipcMain.handle("get-jobdesc", async () => {
-  const rows = await readSheet("Jobdesc!A2:A");
-  return rows.map(r => r[0] || "").filter(v => v);
-});
-
-ipcMain.handle("get-ketua", async () => {
-  const rows = await readSheet("Ketua!A2:A");
-  return rows.map(r => r[0] || "").filter(v => v);
-});
