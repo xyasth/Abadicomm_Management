@@ -163,8 +163,8 @@ app.whenReady().then(() => {
 
   ipcMain.handle("get-schedule", async () => {
     const scheduleRows = await readSheet("Schedule!A3:G");
-    const workerRows = await readSheet("Worker!A3:B");        // [id, name]
-    const jobdescRows = await readSheet("Jobdesc!A3:B");        // [id, name]
+    const workerRows = await readSheet("Worker!A3:B");
+    const jobdescRows = await readSheet("Jobdesc!A3:B");
 
     const workerMap = new Map(workerRows.map((r) => [r[0], r[1]]));
     const jobdescMap = new Map(jobdescRows.map((r) => [r[0], r[1]]));
@@ -264,21 +264,15 @@ app.whenReady().then(() => {
       console.log("Adding schedule:", payload);
 
       // IMPORTANT: Convert to WIB (Asia/Jakarta, GMT+7) timezone
-      // Parse the date and time as if it's in WIB, not local computer time
       const [year, month, day] = payload.date.split('-').map(Number);
       const [startHour, startMinute] = payload.startTime.split(':').map(Number);
       const [endHour, endMinute] = payload.endTime.split(':').map(Number);
 
-      // Create date in UTC, then adjust to WIB (GMT+7 = UTC+7 hours)
-      // WIB offset is 7 hours = 7 * 60 * 60 * 1000 ms = 25200000 ms
       const WIB_OFFSET = 7 * 60 * 60 * 1000;
 
-      // Create UTC date at midnight
       const startDateUTC = Date.UTC(year, month - 1, day, startHour, startMinute, 0);
       const endDateUTC = Date.UTC(year, month - 1, day, endHour, endMinute, 0);
 
-      // Subtract WIB offset to get the correct timestamp
-      // (because UTC timestamp should represent the moment in WIB)
       const startTimestamp = Math.floor((startDateUTC - WIB_OFFSET) / 1000);
       const endTimestamp = Math.floor((endDateUTC - WIB_OFFSET) / 1000);
 
@@ -293,14 +287,18 @@ app.whenReady().then(() => {
 
       for (const schedule of existingSchedules) {
         const scheduleWorkerId = schedule[3];
+        const scheduleSupervisorId = schedule[5];
         const scheduleStart = parseInt(schedule[1]);
         const scheduleEnd = parseInt(schedule[2]);
 
-        // Check if same worker
-        if (scheduleWorkerId === payload.workerId) {
+        // Check if same worker OR same supervisor
+        if (scheduleWorkerId === payload.workerId || scheduleSupervisorId === payload.supervisorId) {
           // Check if times conflict
           if (checkTimeConflict(scheduleStart, scheduleEnd, startTimestamp, endTimestamp)) {
-            // Get the conflicting schedule details for better error message (in WIB)
+            // Determine which person has the conflict
+            const conflictPerson = scheduleWorkerId === payload.workerId ? "Worker" : "Supervisor";
+
+            // Get the conflicting schedule details
             const conflictStart = new Date(scheduleStart * 1000);
             const conflictEnd = new Date(scheduleEnd * 1000);
 
@@ -308,26 +306,26 @@ app.whenReady().then(() => {
               day: "2-digit",
               month: "short",
               year: "numeric",
-              timeZone: "Asia/Jakarta", // WIB
+              timeZone: "Asia/Jakarta",
             });
 
             const conflictStartTime = conflictStart.toLocaleTimeString("id-ID", {
               hour: "2-digit",
               minute: "2-digit",
               hour12: false,
-              timeZone: "Asia/Jakarta", // WIB
+              timeZone: "Asia/Jakarta",
             });
 
             const conflictEndTime = conflictEnd.toLocaleTimeString("id-ID", {
               hour: "2-digit",
               minute: "2-digit",
               hour12: false,
-              timeZone: "Asia/Jakarta", // WIB
+              timeZone: "Asia/Jakarta",
             });
 
             return {
               ok: false,
-              error: `Konflik waktu! Worker sudah ada jadwal pada ${conflictDate} dari ${conflictStartTime} sampai ${conflictEndTime} WIB`
+              error: `Konflik waktu! ${conflictPerson} sudah ada jadwal pada ${conflictDate} dari ${conflictStartTime} sampai ${conflictEndTime} WIB`
             };
           }
         }

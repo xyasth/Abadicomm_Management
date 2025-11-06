@@ -8,11 +8,11 @@ declare global {
       getWorkers: () => Promise<any>;
       getWorkersId: () => Promise<{ id: string; name: string; password: string }[]>;
       getKetua: () => Promise<any>;
-      addSchedule: (payload: any[]) => Promise<{ ok: boolean }>;
       getJobdesc: () => Promise<any>;
       getSchedule: () => Promise<any>;
-      register: (name: string, password: string, role: string) => Promise<any>; // Added 'role'
+      register: (name: string, password: string, role: string) => Promise<any>;
       login: (name: string, password: string) => Promise<any>;
+
       addSchedule: (payload: {
         workerId: string;
         jobdescId: string;
