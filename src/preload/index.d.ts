@@ -24,7 +24,8 @@ declare global {
       addSupervisor: (name: string) => Promise<{ ok: boolean; id?: number; name?: string; error?: string }>;
 
       googleLoginStart: () => Promise<{ success: boolean, message: string, role: string }>;
-      register: (name: string, password: string, role: string) => Promise<{ success: boolean, message: string }>;
+      login: (name: string, password: string) => Promise<{ success: boolean, message: string, role: string }>;
+      register: (name: string, password: string, role: string, email: string) => Promise<{ success: boolean, message: string }>;
     };
   }
 }

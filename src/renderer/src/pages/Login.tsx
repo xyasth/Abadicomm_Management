@@ -32,9 +32,9 @@ export default function Login({ onAuthSuccess, onNavigate }: Props) {
     }
   }
 
-  const goToRegister = () => {
-    onNavigate('register');
-  }
+  // const goToRegister = () => {
+  //   onNavigate('register');
+  // }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-sans">
@@ -67,11 +67,11 @@ export default function Login({ onAuthSuccess, onNavigate }: Props) {
 
           {error && <p className="text-sm text-red-600 text-center">{error}</p>}
 
-          <div className="text-center">
+          {/* <div className="text-center">
             <button onClick={goToRegister} className="text-sm text-[#0066FF] hover:text-[#0052cc] font-medium transition">
               Don't have an account? Register
             </button>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>

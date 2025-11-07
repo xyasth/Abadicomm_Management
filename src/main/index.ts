@@ -7,6 +7,10 @@ import * as bcrypt from 'bcryptjs';
 import { google } from 'googleapis';
 import * as http from 'http';
 import * as url from 'url';
+import * as dotenv from 'dotenv';
+
+const envPath = join(__dirname, '../../.env.local');
+dotenv.config({ path: envPath });
 
 const saltRounds = 10;
 
@@ -50,63 +54,44 @@ function checkTimeConflict(
 async function loginUser(name: string, password: string) {
   const rows = await readSheet("Worker!A2:D");
 
-  const user = rows.find(row => {
-    const sheetName = row[1];
-    return sheetName === name;
-  });
-
-  if (!user) {
-    throw new Error('Invalid name or password.');
-  }
+  const user = rows.find(row => row[1] === name);
+  if (!user) { throw new Error('Invalid name or password.'); }
 
   const storedHash = user[2];
   const roleId = user[3];
-
   const isMatch = await bcrypt.compare(password, storedHash);
 
   if (isMatch) {
-    return {
-      success: true,
-      message: 'Login successful!',
-      role: roleId
-    };
+    return { success: true, message: 'Login successful!', role: roleId };
   } else {
     throw new Error('Invalid name or password.');
   }
 }
 
-async function registerUser(name: string, password: string, role: string) {
-  const rows = await readSheet("Worker!A2:B");
+async function registerUser(name: string, password: string, role: string, email: string) {
+  const rows = await readSheet("Worker!A2:E");
   const names = rows.map(r => r[1]);
   if (names.includes(name)) {
     throw new Error('This name is already registered.');
   }
+  const emails = rows.map(r => r[4]);
+  if (emails.includes(email)) {
+    throw new Error('This email is already registered.');
+  }
 
-  const ids = rows
-    .map(r => Number(r[0]))
-    .filter(id => !isNaN(id));
-
+  const ids = rows.map(r => Number(r[0])).filter(id => !isNaN(id));
   let maxId = 0;
   if (ids.length > 0) {
     maxId = Math.max(...ids);
   }
-
   const newId = maxId + 1;
-
   const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-  await appendSheet("Worker!A:D", [newId, name, hashedPassword, role]);
-
+  await appendSheet("Worker!A:E", [newId, name, hashedPassword, role, email]);
   return { success: true, message: 'Registration successful!' };
 }
 
 async function startGoogleLoginFlow(): Promise<{ success: boolean, message: string, role: string }> {
-
-  // This function creates a Promise that will...
-  // 1. Start a local server
-  // 2. Open the browser
-  // 3. Wait for the server to get the callback code
-  // 4. Resolve with the code
   const getAuthCode = (): Promise<string> => {
     return new Promise((resolve, reject) => {
       const server = http.createServer((req, res) => {
@@ -128,30 +113,26 @@ async function startGoogleLoginFlow(): Promise<{ success: boolean, message: stri
       });
 
       server.listen(3000, () => {
-        // 1. Generate the Auth URL
         const authUrl = oauth2Client.generateAuthUrl({
           access_type: 'offline',
           scope: [
             'https://www.googleapis.com/auth/userinfo.profile',
             'https://www.googleapis.com/auth/userinfo.email',
           ],
+          prompt: 'select_account'
         });
 
-        // 2. Open the user's default browser
         shell.openExternal(authUrl);
       });
     });
   };
 
   try {
-    // 3. Wait for the server to get the code
     const code = await getAuthCode();
 
-    // 4. Exchange the code for tokens
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
 
-    // 5. Get the user's Google profile
     const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
     const userInfo = await oauth2.userinfo.get();
 
@@ -160,13 +141,11 @@ async function startGoogleLoginFlow(): Promise<{ success: boolean, message: stri
       throw new Error('Could not get email from Google.');
     }
 
-    // 6. Check if this email exists in your Worker sheet
-    // We assume Email is in Column E
     const rows = await readSheet("Worker!A2:E");
-    const user = rows.find(row => row[4] === userEmail); // row[4] is Column E
+    const user = rows.find(row => row[4] === userEmail);
 
     if (user) {
-      const roleId = user[3]; // Column D
+      const roleId = user[3];
       return {
         success: true,
         message: 'Login successful!',
@@ -190,7 +169,8 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      sandbox: false,
+      contextIsolation: true
     }
   })
 
@@ -212,24 +192,23 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.electron')
-
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  ipcMain.handle("login-user", (event, name, password) => {
-    return loginUser(name, password);
-  });
-
-  ipcMain.handle("register-user", (event, name, password, role) => {
-    return registerUser(name, password, role);
-  });
+  ipcMain.on('ping', () => console.log('pong'))
 
   ipcMain.handle("google-login-start", () => {
     return startGoogleLoginFlow();
   });
 
-  ipcMain.on('ping', () => console.log('pong'))
+  ipcMain.handle("login-user", (event, name, password) => {
+    return loginUser(name, password);
+  });
+
+  ipcMain.handle("register-user", (event, name, password, role, email) => {
+    return registerUser(name, password, role, email);
+  });
 
   ipcMain.handle("get-workers-id", async () => {
     const rows = await readSheet("Worker!A3:D");
@@ -244,7 +223,6 @@ app.whenReady().then(() => {
 
   ipcMain.handle("get-workers", async () => {
     const rows = await readSheet("Worker!A3:D");
-
     return rows.map(r => ({
       id: r[0] || "",
       name: r[1] || "",

@@ -21,7 +21,6 @@ export async function appendSheet(range: string, row: any[]) {
   try {
     console.log(`Appending to ${range}:`, row);
 
-    // If range doesn't include cell references, append !A:Z to it
     const fullRange = range.includes('!') ? range : `${range}!A:Z`;
 
     const result = await sheets.spreadsheets.values.append({
@@ -39,7 +38,6 @@ export async function appendSheet(range: string, row: any[]) {
   }
 }
 
-// New function to get the next ID for a table
 export async function getNextId(range: string): Promise<number> {
   const rows = await readSheet(range);
   if (rows.length === 0) return 1;
@@ -48,7 +46,6 @@ export async function getNextId(range: string): Promise<number> {
   return ids.length > 0 ? Math.max(...ids) + 1 : 1;
 }
 
-// New function to batch append multiple rows
 export async function batchAppendSheet(range: string, rows: any[][]) {
   if (rows.length === 0) return;
 
