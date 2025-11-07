@@ -25,7 +25,7 @@ declare global {
 
       googleLoginStart: () => Promise<{ success: boolean, message: string, role: string }>;
       login: (name: string, password: string) => Promise<{ success: boolean, message: string, role: string }>;
-      register: (name: string, password: string, role: string, email: string) => Promise<{ success: boolean, message: string }>;
+      register: (name: string, role: string, email: string) => Promise<{ success: boolean, message: string }>;
     };
   }
 }

@@ -1,10 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-// 1. Add the 'Mail' icon
-import { User, Lock, UserCheck, ArrowLeft, Mail } from "lucide-react"
+import { User, UserCheck, ArrowLeft, Mail } from "lucide-react"
 
-// (This declare block is correct and doesn't need to change)
 declare global {
   interface Window {
     electronAPI: {
@@ -18,7 +16,8 @@ declare global {
       addSupervisor: (name: string) => Promise<{ ok: boolean; id?: number; name?: string; error?: string }>;
       googleLoginStart: () => Promise<{ success: boolean, message: string, role: string }>;
       login: (name: string, password: string) => Promise<{ success: boolean, message: string, role: string }>;
-      register: (name: string, password: string, role: string, email: string) => Promise<{ success: boolean, message: string }>;
+      // 2. Updated 'register' type
+      register: (name: string, role: string, email: string) => Promise<{ success: boolean, message: string }>;
     };
   }
 }
@@ -31,8 +30,7 @@ type Props = {
 
 export default function Register({ onNavigate, onCancel, isAdminRegistering }: Props) {
   const [name, setName] = useState("")
-  const [password, setPassword] = useState("")
-  // 2. Add email state
+  // 3. Removed 'password' state
   const [email, setEmail] = useState("")
   const [role, setRole] = useState("2");
   const [isLoading, setIsLoading] = useState(false)
@@ -41,24 +39,21 @@ export default function Register({ onNavigate, onCancel, isAdminRegistering }: P
   useEffect(() => {
     setError("");
     setName("");
-    setPassword("");
-    setEmail(""); // 3. Reset email state
+    setEmail("");
     setRole("2");
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // 4. Add email to validation
-    if (!name || !password || !email) {
-      setError("Name, password, and email are required.")
+    if (!name || !email) {
+      setError("Name and email are required.")
       return
     }
     setError("")
     setIsLoading(true)
 
     try {
-      // 5. Pass email as the 4th argument
-      const data = await window.electronAPI.register(name, password, role, email);
+      const data = await window.electronAPI.register(name, role, email);
       console.log("Registration successful:", data.message);
 
       if (isAdminRegistering) {
@@ -132,7 +127,6 @@ export default function Register({ onNavigate, onCancel, isAdminRegistering }: P
                 </div>
               </div>
 
-              {/* --- 6. ADDED EMAIL INPUT BLOCK --- */}
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
                   Email
@@ -148,28 +142,6 @@ export default function Register({ onNavigate, onCancel, isAdminRegistering }: P
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter email address"
-                    required
-                    className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0066FF] focus:border-transparent transition"
-                  />
-                </div>
-              </div>
-              {/* --- END OF EMAIL BLOCK --- */}
-
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                  Password
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Lock className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder={isAdminRegistering ? "Enter temporary password" : "Enter your password"}
                     required
                     className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0066FF] focus:border-transparent transition"
                   />

@@ -68,7 +68,7 @@ async function loginUser(name: string, password: string) {
   }
 }
 
-async function registerUser(name: string, password: string, role: string, email: string) {
+async function registerUser(name: string, role: string, email: string) {
   const rows = await readSheet("Worker!A2:E");
   const names = rows.map(r => r[1]);
   if (names.includes(name)) {
@@ -85,7 +85,9 @@ async function registerUser(name: string, password: string, role: string, email:
     maxId = Math.max(...ids);
   }
   const newId = maxId + 1;
-  const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+  const defaultPassword = "12121212";
+  const hashedPassword = await bcrypt.hash(defaultPassword, saltRounds);
 
   await appendSheet("Worker!A:E", [newId, name, hashedPassword, role, email]);
   return { success: true, message: 'Registration successful!' };
@@ -206,8 +208,8 @@ app.whenReady().then(() => {
     return loginUser(name, password);
   });
 
-  ipcMain.handle("register-user", (event, name, password, role, email) => {
-    return registerUser(name, password, role, email);
+  ipcMain.handle("register-user", (event, name, role, email) => {
+    return registerUser(name, role, email);
   });
 
   ipcMain.handle("get-workers-id", async () => {
