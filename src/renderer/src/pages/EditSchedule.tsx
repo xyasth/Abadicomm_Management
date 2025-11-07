@@ -349,8 +349,8 @@ export default function EditSchedule({ scheduleData, onBack, onSaveSuccess }: Ed
             location: location,
           };
 
-          if (window.electronAPI?.updateSchedule) {
-            const result = await window.electronAPI.updateSchedule(payload);
+          if ((window as any).electronAPI?.updateSchedule) {
+            const result = await (window as any).electronAPI.updateSchedule(payload);
             return {
               ...result,
               workerName: assignment.workerName
