@@ -5,17 +5,17 @@ import Jadwal from "./pages/Jadwal";
 import AssignWorker from "./pages/AssignWorker";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import EditSchedule from "./pages/EditSchedule";
 
 import { LogOut } from "lucide-react";
 import logo from "./assets/logo_small.png";
 
-type Page = "dashboard" | "assign" | "jadwal" | "login" | "register";
+type Page = "dashboard" | "assign" | "jadwal" | "login" | "register" | "edit";
 
 function App(): React.JSX.Element {
   const [currentPage, setCurrentPage] = useState<Page>("login");
-
+  const [editScheduleData, setEditScheduleData] = useState<any>(null);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
-
   const handleAuthSuccess = (role: string) => {
     setCurrentUserRole(role);
     setCurrentPage("dashboard");
@@ -34,13 +34,26 @@ function App(): React.JSX.Element {
   const goToDashboard = () => {
     setCurrentPage("dashboard");
   }
+  const handleEditSchedule = (scheduleData: any) => {
+    setEditScheduleData(scheduleData);
+    setCurrentPage("edit");
+  };
+
+  const handleBackFromEdit = () => {
+    setEditScheduleData(null);
+    setCurrentPage("jadwal");
+  };
+
+  const handleSaveSuccess = () => {
+    setEditScheduleData(null);
+    setCurrentPage("jadwal");
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
       <header className="bg-white shadow-sm border-b-2 border-blue-600">
-        <div className=" mx-auto px-6 py-4">
+        <div className="mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
-            {/* 🔹 Logo + Nama App */}
             <div className="flex items-center gap-3">
               <img
                 src={logo}
@@ -119,11 +132,10 @@ function App(): React.JSX.Element {
         </nav>
       )}
 
-      {/* 🔹 Konten Utama */}
-      <main className=" mx-auto py-6 sm:px-6 lg:px-8">
+      <main className="mx-auto py-6 sm:px-6 lg:px-8">
         {currentPage === "dashboard" && <Dashboard />}
         {currentPage === "assign" && <AssignWorker />}
-        {currentPage === "jadwal" && <Jadwal />}
+        {currentPage === "jadwal" && <Jadwal onEditSchedule={handleEditSchedule} />}
 
         {currentPage === "login" && (
           <Login
@@ -136,6 +148,13 @@ function App(): React.JSX.Element {
             onNavigate={handleAuthNavigate}
             onCancel={goToDashboard}
             isAdminRegistering={currentUserRole === '3'}
+          />
+        )}
+        {currentPage === "edit" && editScheduleData && (
+          <EditSchedule
+            scheduleData={editScheduleData}
+            onBack={handleBackFromEdit}
+            onSaveSuccess={handleSaveSuccess}
           />
         )}
       </main>
