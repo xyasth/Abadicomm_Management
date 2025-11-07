@@ -2,12 +2,11 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { readSheet, appendSheet, getNextId } from "./googleSheets";
-
+import { readSheet, appendSheet, getNextId, updateSheet } from "./googleSheets";
 
 function formatTimestampParts(timestamp: string | number) {
   if (!timestamp) return { date: "", time: "" };
-  const date = new Date(Number(timestamp) * 1000); // konversi detik ke ms
+  const date = new Date(Number(timestamp) * 1000);
 
   const datePart = date.toLocaleDateString("id-ID", {
     weekday: "long",
@@ -27,17 +26,12 @@ function formatTimestampParts(timestamp: string | number) {
   return { date: datePart, time: timePart };
 }
 
-// Helper function to check for time conflicts
 function checkTimeConflict(
   existingStart: number,
   existingEnd: number,
   newStart: number,
   newEnd: number
 ): boolean {
-  // Check if times overlap
-  // Conflict exists if:
-  // - New event starts before existing ends AND
-  // - New event ends after existing starts
   return newStart < existingEnd && newEnd > existingStart;
 }
 
@@ -109,11 +103,12 @@ app.whenReady().then(() => {
     const workerMap = new Map(workerRows.map((r) => [r[0], r[1]]));
     const jobdescMap = new Map(jobdescRows.map((r) => [r[0], r[1]]));
 
-    const schedules = scheduleRows.map((r) => {
+    const schedules = scheduleRows.map((r, index) => {
       const start = formatTimestampParts(r[1]);
       const end = formatTimestampParts(r[2]);
       return {
         id: r[0] || "",
+        rowIndex: index + 3,
         worker_id: r[3] || "",
         worker_name: workerMap.get(r[3]) || "Unknown",
         jobdesc_id: r[4] || "",
@@ -124,6 +119,8 @@ app.whenReady().then(() => {
         date: start.date,
         start_time: start.time,
         end_time: end.time,
+        raw_start_timestamp: r[1] || "",
+        raw_end_timestamp: r[2] || "",
       };
     });
 
@@ -201,7 +198,6 @@ app.whenReady().then(() => {
     try {
       console.log("Adding schedule:", payload);
 
-      // IMPORTANT: Convert to WIB (Asia/Jakarta, GMT+7) timezone
       const [year, month, day] = payload.date.split('-').map(Number);
       const [startHour, startMinute] = payload.startTime.split(':').map(Number);
       const [endHour, endMinute] = payload.endTime.split(':').map(Number);
@@ -217,10 +213,7 @@ app.whenReady().then(() => {
       console.log("Input date/time:", `${payload.date} ${payload.startTime} - ${payload.endTime}`);
       console.log("Start Timestamp (WIB):", startTimestamp);
       console.log("End Timestamp (WIB):", endTimestamp);
-      console.log("Verification - Start:", new Date(startTimestamp * 1000).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }));
-      console.log("Verification - End:", new Date(endTimestamp * 1000).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }));
 
-      // Check for time conflicts with existing schedules
       const existingSchedules = await readSheet("Schedule!A3:G");
 
       for (const schedule of existingSchedules) {
@@ -229,14 +222,9 @@ app.whenReady().then(() => {
         const scheduleStart = parseInt(schedule[1]);
         const scheduleEnd = parseInt(schedule[2]);
 
-        // Check if same worker OR same supervisor
         if (scheduleWorkerId === payload.workerId || scheduleSupervisorId === payload.supervisorId) {
-          // Check if times conflict
           if (checkTimeConflict(scheduleStart, scheduleEnd, startTimestamp, endTimestamp)) {
-            // Determine which person has the conflict
             const conflictPerson = scheduleWorkerId === payload.workerId ? "Worker" : "Supervisor";
-
-            // Get the conflicting schedule details
             const conflictStart = new Date(scheduleStart * 1000);
             const conflictEnd = new Date(scheduleEnd * 1000);
 
@@ -272,7 +260,6 @@ app.whenReady().then(() => {
       const nextId = await getNextId("Schedule!A3:A");
       console.log("Next schedule ID:", nextId);
 
-      // Format: [Id, Waktu Mulai, Waktu Selesai, Worker_id, Jobdesc_id, Supervisor_id, Tempat]
       const row = [
         nextId.toString(),
         startTimestamp.toString(),
@@ -293,6 +280,151 @@ app.whenReady().then(() => {
     }
   });
 
+  // FINAL STRATEGY: Update ALL rows that match the scheduleIds
+  ipcMain.handle("update-schedule", async (_, payload: {
+    scheduleIdsToDelete: string[];
+    workerId: string;
+    jobdescId: string;
+    supervisorId: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    location: string;
+  }) => {
+    try {
+      console.log("=== UPDATE SCHEDULE (UPDATE ALL MATCHING ROWS) ===");
+      console.log("Schedule IDs to update:", payload.scheduleIdsToDelete);
+      console.log("New data:", {
+        workerId: payload.workerId,
+        jobdescId: payload.jobdescId,
+        supervisorId: payload.supervisorId,
+        date: payload.date,
+        time: `${payload.startTime} - ${payload.endTime}`,
+        location: payload.location
+      });
+
+      // Calculate new timestamps
+      const [year, month, day] = payload.date.split('-').map(Number);
+      const [startHour, startMinute] = payload.startTime.split(':').map(Number);
+      const [endHour, endMinute] = payload.endTime.split(':').map(Number);
+
+      const WIB_OFFSET = 7 * 60 * 60 * 1000;
+      const startDateUTC = Date.UTC(year, month - 1, day, startHour, startMinute, 0);
+      const endDateUTC = Date.UTC(year, month - 1, day, endHour, endMinute, 0);
+      const startTimestamp = Math.floor((startDateUTC - WIB_OFFSET) / 1000);
+      const endTimestamp = Math.floor((endDateUTC - WIB_OFFSET) / 1000);
+
+      console.log("New timestamps:", { startTimestamp, endTimestamp });
+
+      // Get all schedules and find ALL rows that need to be updated
+      const scheduleRows = await readSheet("Schedule!A3:G");
+      const rowsToUpdate: Array<{rowNum: number, scheduleId: string, oldData: any[]}> = [];
+
+      scheduleRows.forEach((row, index) => {
+        const scheduleId = row[0];
+        if (payload.scheduleIdsToDelete.includes(scheduleId)) {
+          rowsToUpdate.push({
+            rowNum: index + 3,
+            scheduleId: scheduleId,
+            oldData: row
+          });
+          console.log(`Found schedule ID ${scheduleId} at row ${index + 3}`, {
+            oldWorkerId: row[3],
+            oldJobdescId: row[4],
+            oldSupervisorId: row[5],
+            oldLocation: row[6]
+          });
+        }
+      });
+
+      if (rowsToUpdate.length === 0) {
+        console.error("No schedules found to update!");
+        return { ok: false, error: "Schedule not found. Please refresh and try again." };
+      }
+
+      console.log(`Found ${rowsToUpdate.length} rows to update`);
+
+      // Check for conflicts (excluding the rows we're updating)
+      const scheduleIdsBeingUpdated = new Set(payload.scheduleIdsToDelete);
+
+      for (const schedule of scheduleRows) {
+        const scheduleId = schedule[0];
+
+        if (scheduleIdsBeingUpdated.has(scheduleId)) {
+          continue;
+        }
+
+        const scheduleWorkerId = schedule[3];
+        const scheduleSupervisorId = schedule[5];
+        const scheduleStart = parseInt(schedule[1]);
+        const scheduleEnd = parseInt(schedule[2]);
+
+        if (scheduleWorkerId === payload.workerId || scheduleSupervisorId === payload.supervisorId) {
+          if (checkTimeConflict(scheduleStart, scheduleEnd, startTimestamp, endTimestamp)) {
+            const conflictPerson = scheduleWorkerId === payload.workerId ? "Worker" : "Supervisor";
+            const conflictStart = new Date(scheduleStart * 1000);
+            const conflictDate = conflictStart.toLocaleDateString("id-ID", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+              timeZone: "Asia/Jakarta",
+            });
+            const conflictStartTime = conflictStart.toLocaleTimeString("id-ID", {
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+              timeZone: "Asia/Jakarta",
+            });
+            const conflictEndTime = new Date(scheduleEnd * 1000).toLocaleTimeString("id-ID", {
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+              timeZone: "Asia/Jakarta",
+            });
+
+            return {
+              ok: false,
+              error: `Konflik waktu! ${conflictPerson} sudah ada jadwal pada ${conflictDate} dari ${conflictStartTime} sampai ${conflictEndTime} WIB`
+            };
+          }
+        }
+      }
+
+      // Update ALL rows with the SAME new data (timestamps, supervisor, location)
+      // But keep the ORIGINAL worker_id and jobdesc_id for each row
+      console.log(`Updating ${rowsToUpdate.length} rows...`);
+
+      for (const {rowNum, scheduleId, oldData} of rowsToUpdate) {
+        const updatedRow = [
+          scheduleId,              // Keep same ID
+          startTimestamp.toString(), // Update timestamp
+          endTimestamp.toString(),   // Update timestamp
+          oldData[3],              // Keep ORIGINAL worker_id
+          oldData[4],              // Keep ORIGINAL jobdesc_id
+          payload.supervisorId,    // Update supervisor
+          payload.location         // Update location
+        ];
+
+        console.log(`Updating row ${rowNum}:`, {
+          scheduleId,
+          keepingWorkerId: oldData[3],
+          keepingJobdescId: oldData[4],
+          newSupervisor: payload.supervisorId,
+          newLocation: payload.location
+        });
+
+        await updateSheet("Schedule", rowNum, updatedRow);
+        console.log(`✓ Updated row ${rowNum}`);
+      }
+
+      console.log("=== UPDATE COMPLETE ===");
+      return { ok: true, id: parseInt(rowsToUpdate[0].scheduleId) };
+    } catch (error) {
+      console.error("Error updating schedule:", error);
+      return { ok: false, error: String(error) };
+    }
+  });
+
   createWindow()
 
   app.on('activate', function () {
@@ -305,4 +437,3 @@ app.on('window-all-closed', () => {
     app.quit()
   }
 })
-

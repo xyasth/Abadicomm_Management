@@ -68,7 +68,10 @@ function LoadingSpinner() {
   );
 }
 
-export default function Jadwal() {
+interface JadwalProps {
+  onEditSchedule: (scheduleData: any) => void;
+}
+export default function Jadwal({ onEditSchedule }: JadwalProps) {
   const [rawSchedule, setRawSchedule] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [scheduleMap, setScheduleMap] = useState<ScheduleMap>({});
@@ -576,42 +579,49 @@ export default function Jadwal() {
 
                         return (
                           <div
-                            key={ev.id}
-                            style={{
-                              gridRowStart: ev.gridRowStart,
-                              gridRowEnd: `span ${ev.gridRowSpan}`,
-                              gridColumnStart: colStart,
-                              padding: "0.25rem",
-                              zIndex: 5,
-                              position: "relative",
-                            }}
-                            className="group cursor-pointer"
-                          >
-                            <div className="flex-1 min-w-0 p-2 border border-blue-200 rounded-lg bg-blue-50 shadow-sm overflow-hidden h-full relative transition hover:shadow-lg hover:bg-blue-100">
-                              {/* Nama supervisor */}
-                              <div className="text-blue-700 font-semibold mb-1 text-xs truncate">
-                                {ev.supervisor_name}
-                              </div>
+  key={ev.id}
+  style={{
+    gridRowStart: ev.gridRowStart,
+    gridRowEnd: `span ${ev.gridRowSpan}`,
+    gridColumnStart: colStart,
+    padding: "0.25rem",
+    zIndex: 5,
+    position: "relative",
+  }}
+  className="group cursor-pointer"
+  onClick={() => {
+    onEditSchedule({
+      dateKey: d.formatted,
+      supervisor_name: ev.supervisor_name,
+      start: ev.start,
+      end: ev.end,
+      workers: ev.workers,
+      location: ev.workers[0]?.tempat || ""
+    });
+  }}
+>
+  <div className="flex-1 min-w-0 p-2 border border-blue-200 rounded-lg bg-blue-50 shadow-sm overflow-hidden h-full relative transition hover:shadow-lg hover:bg-blue-100">
+    <div className="text-blue-700 font-semibold mb-1 text-xs truncate">
+      {ev.supervisor_name}
+    </div>
 
-                              {/* Daftar pekerja */}
-                              {ev.workers.map((w: any, j: number) => (
-                                <div key={j} className="text-xs text-gray-700 leading-tight truncate">
-                                  • {w.worker_name} —{" "}
-                                  <span className="font-medium">{w.jobdesc_name}</span>
-                                </div>
-                              ))}
+    {ev.workers.map((w: any, j: number) => (
+      <div key={j} className="text-xs text-gray-700 leading-tight truncate">
+        • {w.worker_name} —{" "}
+        <span className="font-medium">{w.jobdesc_name}</span>
+      </div>
+    ))}
 
-                              {/* Tombol Edit muncul saat hover */}
-                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                <span className="opacity-0 group-hover:opacity-100 text-gray-500 font-medium text-sm flex items-center gap-1 transition">
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.586-9.414a2 2 0 112.828 2.828L11 15l-4 1 1-4 8.414-8.414z" />
-                                  </svg>
-                                  Edit
-                                </span>
-                              </div>
-                            </div>
-                          </div>
+    <div className="absolute inset-0 flex items-center justify-center bg-blue-600 bg-opacity-0 group-hover:bg-opacity-10 transition-all pointer-events-none">
+      <span className="opacity-0 group-hover:opacity-100 text-blue-700 font-bold text-sm flex items-center gap-1 transition-opacity bg-white px-3 py-1 rounded-full shadow-lg">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.586-9.414a2 2 0 112.828 2.828L11 15l-4 1 1-4 8.414-8.414z" />
+        </svg>
+        Click to Edit
+      </span>
+    </div>
+  </div>
+</div>
 
                         );
                       })}

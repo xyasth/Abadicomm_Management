@@ -10,7 +10,19 @@ declare global {
       getKetua: () => Promise<any>;
       getJobdesc: () => Promise<any>;
       getSchedule: () => Promise<any>;
+
       addSchedule: (payload: {
+        workerId: string;
+        jobdescId: string;
+        supervisorId: string;
+        date: string;
+        startTime: string;
+        endTime: string;
+        location: string;
+      }) => Promise<{ ok: boolean; id?: number; error?: string }>;
+
+      updateSchedule: (payload: {
+        scheduleIdsToDelete: string[];
         workerId: string;
         jobdescId: string;
         supervisorId: string;
