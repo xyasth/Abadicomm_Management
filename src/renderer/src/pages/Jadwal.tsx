@@ -1,5 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react"; // MODIFIKASI: Tambah useRef
+import { Edit } from "lucide-react";
+import jsPDF from "jspdf"; // BARU: Untuk membuat PDF
+import html2canvas from "html2canvas"; // BARU: Untuk "screenshot" elemen
 
 // Tipe data untuk tabel jadwal baru (Dikelompokkan per hari)
 // Diubah menjadi 'any[]' untuk mengakomodasi properti subColumn/totalSubColumns
@@ -68,7 +71,11 @@ function LoadingSpinner() {
   );
 }
 
-export default function Jadwal() {
+// MODIFIKASI: Prop dari file 1 dipertahankan
+interface JadwalProps {
+  onEditSchedule: (scheduleData: any) => void;
+}
+export default function Jadwal({ onEditSchedule }: JadwalProps) {
   const [rawSchedule, setRawSchedule] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [scheduleMap, setScheduleMap] = useState<ScheduleMap>({});
@@ -76,7 +83,11 @@ export default function Jadwal() {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [alertMessage, setAlertMessage] = useState<string>("");
-  // 🔹 State 'workers' dihapus
+  const [isExporting, setIsExporting] = useState(false); // BARU: State untuk export
+
+  // BARU: Ref untuk PDF
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scheduleGridRef = useRef<HTMLDivElement>(null);
 
   // --- 🔹 PENGATURAN WAKTU (dari file 3) 🔹 ---
   // Jam mulai (misal: 7 berarti 07:00)
@@ -86,8 +97,6 @@ export default function Jadwal() {
   const TIME_SLOT_HEIGHT = 60; // Tinggi per jam dalam px
 
   // --- FUNGSI HELPER ---
-
-  // 🔹 Helper `getRoleName` dihapus
 
   // --- Fungsi Tanggal (dari file 3) ---
   function getCurrentWeekDates() {
@@ -152,10 +161,7 @@ export default function Jadwal() {
     setEndDate(weekDates.end);
   }, []);
 
-  // --- 🔹 FETCH WORKERS dihapus ---
-
   // --- 🔹 Pengambilan Data (Fetch Schedule - dari file 3) 🔹 ---
-  // (Tanpa Mock Data)
   useEffect(() => {
     setIsLoading(true); // Mulai loading
     if (window.electronAPI) {
@@ -237,15 +243,6 @@ export default function Jadwal() {
         startHour < TIME_SLOT_BASE_HOUR || // Mulai sblm 07:00
         slotEndHour > TIME_SLOT_END_HOUR // Slot terakhir adalah stlh 20:00
       ) {
-        console.warn(
-          `Skipping event outside ${String(
-            TIME_SLOT_BASE_HOUR,
-          ).padStart(2, "0")}:00-${String(TIME_SLOT_END_HOUR + 1).padStart(
-            2,
-            "0",
-          )}:00 range:`,
-          ev,
-        );
         return;
       }
 
@@ -314,14 +311,143 @@ export default function Jadwal() {
     }
     console.log("👨‍💼 Processed Supervisor Map:", newSupervisorMap);
     setSupervisorMap(newSupervisorMap);
-  }, [isLoading, rawSchedule, timeSlots.length, TIME_SLOT_BASE_HOUR, TIME_SLOT_END_HOUR]); // Dependensi diperbarui
+  }, [isLoading, rawSchedule, timeSlots.length, TIME_SLOT_BASE_HOUR, TIME_SLOT_END_HOUR]);
 
-  // --- Handle Export (Tetap sama) ---
+  // --- MODIFIKASI TOTAL: Handle Export PDF (dari file 2) ---
   const handleExport = () => {
-    console.log("Exporting Excel...");
-    console.log("Start:", startDate);
-    console.log("End:", endDate);
-    // ...
+    const scrollContainer = scrollContainerRef.current;
+    const gridElement = scheduleGridRef.current;
+
+    if (!scrollContainer || !gridElement) {
+      console.error("Elemen grid jadwal tidak ditemukan!");
+      setAlertMessage("Gagal mengekspor: Elemen tidak ditemukan.");
+      return;
+    }
+
+    setAlertMessage("Mempersiapkan PDF... Ini mungkin perlu beberapa saat.");
+    setIsExporting(true);
+
+    // --- PERSIAPAN DOM ---
+    const originalScrollStyle = scrollContainer.style.cssText;
+    const originalStyles: { el: HTMLElement; cssText: string }[] = [];
+
+    // 2. Temukan semua elemen sticky
+    const stickyElements = gridElement.querySelectorAll<HTMLElement>(
+      '[data-export-sticky="true"]',
+    );
+    stickyElements.forEach((el) => {
+      originalStyles.push({ el: el, cssText: el.style.cssText });
+      // 3. Nonaktifkan sticky
+      el.style.position = "relative";
+      el.style.top = "auto";
+      el.style.left = "auto";
+      el.style.zIndex = "1";
+    });
+
+    // 4. Temukan semua elemen KARTU
+    const cardElements = gridElement.querySelectorAll<HTMLElement>(
+      '[data-export-card="true"]',
+    );
+    cardElements.forEach((el) => {
+      originalStyles.push({ el: el, cssText: el.style.cssText });
+      // 5. Nonaktifkan overflow-hidden
+      el.style.overflow = "visible";
+    });
+
+    // 6. Temukan semua elemen TRUNCATE
+    const truncateElements = gridElement.querySelectorAll<HTMLElement>(
+      '[data-export-truncate="true"]',
+    );
+    truncateElements.forEach((el) => {
+      originalStyles.push({ el: el, cssText: el.style.cssText });
+      // 7. Nonaktifkan truncate
+      el.style.overflow = "visible";
+      el.style.whiteSpace = "normal"; // <-- Sangat penting
+      el.style.textOverflow = "unset";
+    });
+
+    // 8. Nonaktifkan scroll pada container
+    scrollContainer.style.maxHeight = "none";
+    scrollContainer.style.overflow = "visible";
+    scrollContainer.scrollTop = 0;
+    scrollContainer.scrollLeft = 0;
+
+    // --- FUNGSI CLEANUP (PENTING!) ---
+    const cleanupDOM = () => {
+      // Kembalikan style container
+      scrollContainer.style.cssText = originalScrollStyle;
+      // Kembalikan *semua* style yang kita ubah
+      originalStyles.forEach((style) => {
+        style.el.style.cssText = style.cssText;
+      });
+      // Selesai loading
+      setIsExporting(false);
+      setTimeout(() => {
+        setAlertMessage((prev) =>
+          prev === "Mempersiapkan PDF... Ini mungkin perlu beberapa saat."
+            ? ""
+            : prev,
+        );
+      }, 3000);
+    };
+
+    // Beri waktu browser untuk menggambar ulang DOM
+    setTimeout(() => {
+      html2canvas(gridElement, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        allowTaint: true,
+        backgroundColor: "#ffffff",
+        width: gridElement.scrollWidth,
+        height: gridElement.scrollHeight,
+        windowWidth: gridElement.scrollWidth,
+        windowHeight: gridElement.scrollHeight,
+      })
+        .then((canvas) => {
+          // --- LOGIKA PDF ---
+          const imgData = canvas.toDataURL("image/png");
+          const imgWidth = canvas.width;
+          const imgHeight = canvas.height;
+
+          const orientation = "p";
+          const pdfWidth = 210;
+          const pdfHeight = 297;
+          const margin = 10;
+
+          const pdf = new jsPDF({
+            orientation: orientation,
+            unit: "mm",
+            format: "a4",
+          });
+
+          const usableWidth = pdfWidth - margin * 2;
+          const ratio = usableWidth / imgWidth;
+          const finalImgWidth = usableWidth;
+          const finalImgHeight = imgHeight * ratio;
+
+          pdf.addImage(
+            imgData,
+            "PNG",
+            margin,
+            margin,
+            finalImgWidth,
+            finalImgHeight,
+          );
+
+          const dateStr = new Date().toISOString().split("T")[0];
+          pdf.save(`Jadwal_${startDate}_${endDate}_${dateStr}.pdf`);
+          setAlertMessage("PDF berhasil dibuat!");
+        })
+        .catch((err) => {
+          console.error("Error creating PDF:", err);
+          setAlertMessage("Terjadi kesalahan saat membuat PDF: " + err.message);
+        })
+        .finally(() => {
+          // --- PANGGIL CLEANUP ---
+          cleanupDOM();
+        });
+    }, 100); // 100ms delay untuk DOM re-render
   };
 
   // --- Hitung lebar per hari (Logika dari Dashboard dipertahankan) ---
@@ -386,19 +512,27 @@ export default function Jadwal() {
         ) : (
           // 🔹 Hapus layout grid 1/4 + 3/4
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition">
-            <div className="overflow-auto max-h-[80vh]">
-              {/* Grid Utama (Logika dari Dashboard dipertahankan) */}
+            {/* MODIFIKASI: Tambah ref ke container scroll */}
+            <div
+              className="overflow-auto max-h-[80vh]"
+              ref={scrollContainerRef}
+            >
+              {/* MODIFIKASI: Tambah ref ke grid di dalam */}
               <div
+                ref={scheduleGridRef}
                 className="grid"
                 style={{
                   gridTemplateColumns: `120px ${dayWidths.join(" ")}`,
                   minWidth: "max-content",
+                  backgroundColor: "#ffffff", // BARU: Pastikan bg putih untuk capture
                 }}
               >
                 {/* --- HEADER (2 Baris, Sticky) --- */}
 
                 {/* Baris 1: Jam (Span 2 baris) */}
+                {/* MODIFIKASI: Tambah data-export-sticky */}
                 <div
+                  data-export-sticky="true"
                   className="sticky top-0 left-0 px-6 py-4 text-left text-sm font-semibold text-gray-700 bg-gray-50 border-b border-r border-gray-200 z-30 flex items-center"
                   style={{ gridRow: "span 2 / span 2" }}
                 >
@@ -407,8 +541,10 @@ export default function Jadwal() {
 
                 {/* Baris 1: Tanggal */}
                 {displayedDates.map((w) => (
+                  // MODIFIKASI: Tambah data-export-sticky
                   <div
                     key={w.formatted}
+                    data-export-sticky="true"
                     className="sticky top-0 px-6 py-4 text-center text-sm font-semibold text-gray-700 bg-gray-100 border-b border-gray-200 z-20"
                   >
                     {w.day},{" "}
@@ -442,8 +578,10 @@ export default function Jadwal() {
                     ) || 1;
 
                   return (
+                    // MODIFIKASI: Tambah data-export-sticky
                     <div
                       key={`${d.formatted}-supervisors`}
+                      data-export-sticky="true"
                       className="sticky top-[57px] bg-gray-50 border-b border-gray-200 z-20"
                       style={{
                         gridColumnStart: dayIndex + 2,
@@ -484,7 +622,9 @@ export default function Jadwal() {
                 {/* --- BODY GRID --- */}
 
                 {/* Kolom 1: Sumbu Jam */}
+                {/* MODIFIKASI: Tambah data-export-sticky */}
                 <div
+                  data-export-sticky="true"
                   className="col-start-1 sticky left-0 z-10"
                   style={{
                     display: "grid",
@@ -582,16 +722,40 @@ export default function Jadwal() {
                               gridRowEnd: `span ${ev.gridRowSpan}`,
                               gridColumnStart: colStart,
                               padding: "0.25rem",
-                              zIndex: 1,
+                              zIndex: 5, // zIndex dari file 1
+                              position: "relative", // dari file 1
+                            }}
+                            className="group cursor-pointer" // dari file 1
+                            onClick={() => {
+                              // dari file 1
+                              onEditSchedule({
+                                dateKey: d.formatted,
+                                supervisor_name: ev.supervisor_name,
+                                start: ev.start,
+                                end: ev.end,
+                                workers: ev.workers,
+                                location: ev.workers[0]?.tempat || "",
+                              });
                             }}
                           >
-                            <div className="flex-1 min-w-0 p-2 border border-blue-200 rounded-lg bg-blue-50 shadow-sm overflow-hidden h-full">
-                              <div className="text-blue-700 font-semibold mb-1 text-xs truncate">
+                            {/* MODIFIKASI: Tambah data-export-card */}
+                            <div
+                              data-export-card="true"
+                              className="flex-1 min-w-0 p-2 border border-blue-200 rounded-lg bg-blue-50 shadow-sm overflow-hidden h-full relative transition hover:shadow-lg hover:bg-blue-100" // Class dari file 1
+                            >
+                              {/* MODIFIKASI: Tambah data-export-truncate */}
+                              <div
+                                data-export-truncate="true"
+                                className="text-blue-700 font-semibold mb-1 text-xs truncate"
+                              >
                                 {ev.supervisor_name}
                               </div>
+
                               {ev.workers.map((w: any, j: number) => (
+                                // MODIFIKASI: Tambah data-export-truncate
                                 <div
                                   key={j}
+                                  data-export-truncate="true"
                                   className="text-xs text-gray-700 leading-tight truncate"
                                 >
                                   • {w.worker_name} —{" "}
@@ -600,6 +764,27 @@ export default function Jadwal() {
                                   </span>
                                 </div>
                               ))}
+
+                              {/* Overlay "Click to Edit" dari file 1 */}
+                              <div className="absolute inset-0 flex items-center justify-center bg-blue-600 bg-opacity-0 group-hover:bg-opacity-10 transition-all pointer-events-none">
+                                <span className="opacity-0 group-hover:opacity-100 text-blue-700 font-bold text-sm flex items-center gap-1 transition-opacity bg-white px-3 py-1 rounded-full shadow-lg">
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="h-4 w-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.586-9.414a2 2 0 112.828 2.828L11 15l-4 1 1-4 8.414-8.414z"
+                                    />
+                                  </svg>
+                                  Click to Edit
+                                </span>
+                              </div>
                             </div>
                           </div>
                         );
@@ -608,7 +793,9 @@ export default function Jadwal() {
                   );
                 })}
               </div>
+              {/* Akhir dari scheduleGridRef */}
             </div>
+            {/* Akhir dari scrollContainerRef */}
 
             {/* 🔹 Filter + Export (Logika dari file 3) 🔹 */}
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
@@ -644,11 +831,13 @@ export default function Jadwal() {
                 {/* HAPUS End Date Picker */}
               </div>
 
+              {/* MODIFIKASI: Tombol Export PDF dari file 2 */}
               <button
                 onClick={handleExport}
-                className="px-5 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold transition"
+                disabled={isExporting}
+                className="px-5 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Export Excel
+                {isExporting ? "Mengekspor..." : "Export PDF"}
               </button>
             </div>
           </div>
