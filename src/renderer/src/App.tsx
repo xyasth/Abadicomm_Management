@@ -92,16 +92,18 @@ function App(): React.JSX.Element {
             >
               Dashboard
             </button>
-            <button
-              onClick={() => setCurrentPage("assign")}
-              className={`text-sm font-medium transition ${
-                currentPage === "assign"
-                  ? "text-blue-600"
-                  : "text-gray-700 hover:text-blue-600"
-              }`}
-            >
-              Assign Worker
-            </button>
+            {currentUserRole === '3' && (
+              <button
+                onClick={() => setCurrentPage("assign")}
+                className={`text-sm font-medium transition ${
+                  currentPage === "assign"
+                    ? "text-blue-600"
+                    : "text-gray-700 hover:text-blue-600"
+                }`}
+              >
+                Assign Worker
+              </button>
+            )}
 
             <button
               onClick={() => setCurrentPage("jadwal")}
