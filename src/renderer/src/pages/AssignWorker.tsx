@@ -360,6 +360,8 @@ export default function AssignWorker() {
                   type="time"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
+                  min="07:00"
+                  max="21:00"
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-blue-50"
                   required
                 />
@@ -371,6 +373,8 @@ export default function AssignWorker() {
                   type="time"
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
+                  min="07:00"
+                  max="21:00"
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-blue-50"
                   required
                 />
