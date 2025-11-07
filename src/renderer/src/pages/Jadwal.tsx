@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { useEffect, useState, useRef } from "react"; // MODIFIKASI: Tambah useRef
-import { Edit } from "lucide-react";
 import jsPDF from "jspdf"; // BARU: Untuk membuat PDF
 import html2canvas from "html2canvas"; // BARU: Untuk "screenshot" elemen
 
@@ -412,7 +411,6 @@ export default function Jadwal({ onEditSchedule }: JadwalProps) {
 
           const orientation = "p";
           const pdfWidth = 210;
-          const pdfHeight = 297;
           const margin = 10;
 
           const pdf = new jsPDF({

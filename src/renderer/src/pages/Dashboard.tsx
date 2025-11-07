@@ -88,7 +88,17 @@ export default function Dashboard() {
     };
 
     rawSchedule.forEach((item) => {
+      // Handle cases where item.date might be invalid
+      if (!item.date) {
+        console.warn("Invalid schedule item, missing date:", item);
+        return;
+      }
       const date = new Date(item.date);
+      if (isNaN(date.getTime())) { // Check for invalid date
+        console.warn("Invalid date in schedule item:", item);
+        return;
+      }
+
       const dateKey = date.toLocaleDateString("sv-SE"); // hasilnya "2025-11-06"
       const key = `${dateKey}_${item.supervisor_name}_${item.start_time}`;
 
@@ -113,6 +123,12 @@ export default function Dashboard() {
     Object.values(grouped).forEach((ev: any) => {
       const s = parseTime(ev.start);
       const e = parseTime(ev.end);
+      // Add checks for invalid start/end times
+      if (isNaN(s.h) || isNaN(e.h)) {
+        console.warn("Invalid start/end time in event:", ev);
+        return;
+      }
+
       const startHour = s.h;
       const endHour = e.m > 0 ? e.h : e.h - 1;
 

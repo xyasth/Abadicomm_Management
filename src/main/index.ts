@@ -3,6 +3,22 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { readSheet, appendSheet, getNextId, updateSheet } from "./googleSheets";
+import * as bcrypt from 'bcryptjs';
+import { google } from 'googleapis';
+import * as http from 'http';
+import * as url from 'url';
+import * as dotenv from 'dotenv';
+
+const envPath = join(__dirname, '../../.env.local');
+dotenv.config({ path: envPath });
+
+const saltRounds = 10;
+
+const oauth2Client = new google.auth.OAuth2(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  process.env.GOOGLE_REDIRECT_URI
+);
 
 function formatTimestampParts(timestamp: string | number) {
   if (!timestamp) return { date: "", time: "" };
@@ -35,6 +51,117 @@ function checkTimeConflict(
   return newStart < existingEnd && newEnd > existingStart;
 }
 
+async function loginUser(name: string, password: string) {
+  const rows = await readSheet("Worker!A2:D");
+
+  const user = rows.find(row => row[1] === name);
+  if (!user) { throw new Error('Invalid name or password.'); }
+
+  const storedHash = user[2];
+  const roleId = user[3];
+  const isMatch = await bcrypt.compare(password, storedHash);
+
+  if (isMatch) {
+    return { success: true, message: 'Login successful!', role: roleId };
+  } else {
+    throw new Error('Invalid name or password.');
+  }
+}
+
+async function registerUser(name: string, role: string, email: string) {
+  const rows = await readSheet("Worker!A2:E");
+  const names = rows.map(r => r[1]);
+  if (names.includes(name)) {
+    throw new Error('This name is already registered.');
+  }
+  const emails = rows.map(r => r[4]);
+  if (emails.includes(email)) {
+    throw new Error('This email is already registered.');
+  }
+
+  const ids = rows.map(r => Number(r[0])).filter(id => !isNaN(id));
+  let maxId = 0;
+  if (ids.length > 0) {
+    maxId = Math.max(...ids);
+  }
+  const newId = maxId + 1;
+
+  const defaultPassword = "12121212";
+  const hashedPassword = await bcrypt.hash(defaultPassword, saltRounds);
+
+  await appendSheet("Worker!A:E", [newId, name, hashedPassword, role, email]);
+  return { success: true, message: 'Registration successful!' };
+}
+
+async function startGoogleLoginFlow(): Promise<{ success: boolean, message: string, role: string }> {
+  const getAuthCode = (): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const server = http.createServer((req, res) => {
+        if (!req.url) {
+          return reject(new Error('Invalid request'));
+        }
+
+        const { code } = url.parse(req.url, true).query;
+
+        if (code) {
+          res.end('<h1>Success!</h1><p>You are logged in. You can close this window.</p>');
+          server.close();
+          resolve(code as string);
+        } else {
+          res.end('<h1>Error</h1><p>Something went wrong. Please try again.</p>');
+          server.close();
+          reject(new Error('No auth code found in callback.'));
+        }
+      });
+
+      server.listen(3000, () => {
+        const authUrl = oauth2Client.generateAuthUrl({
+          access_type: 'offline',
+          scope: [
+            'https://www.googleapis.com/auth/userinfo.profile',
+            'https://www.googleapis.com/auth/userinfo.email',
+          ],
+          prompt: 'select_account'
+        });
+
+        shell.openExternal(authUrl);
+      });
+    });
+  };
+
+  try {
+    const code = await getAuthCode();
+
+    const { tokens } = await oauth2Client.getToken(code);
+    oauth2Client.setCredentials(tokens);
+
+    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+    const userInfo = await oauth2.userinfo.get();
+
+    const userEmail = userInfo.data.email;
+    if (!userEmail) {
+      throw new Error('Could not get email from Google.');
+    }
+
+    const rows = await readSheet("Worker!A2:E");
+    const user = rows.find(row => row[4] === userEmail);
+
+    if (user) {
+      const roleId = user[3];
+      return {
+        success: true,
+        message: 'Login successful!',
+        role: roleId
+      };
+    } else {
+      throw new Error('This Google account is not registered as a worker.');
+    }
+  } catch (error: any) {
+    console.error('Google login flow error:', error);
+    throw new Error(error.message || 'Google login failed.');
+  }
+}
+
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: 900,
@@ -44,7 +171,8 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      sandbox: false,
+      contextIsolation: true
     }
   })
 
@@ -66,12 +194,23 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.electron')
-
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
 
   ipcMain.on('ping', () => console.log('pong'))
+
+  ipcMain.handle("google-login-start", () => {
+    return startGoogleLoginFlow();
+  });
+
+  ipcMain.handle("login-user", (event, name, password) => {
+    return loginUser(name, password);
+  });
+
+  ipcMain.handle("register-user", (event, name, role, email) => {
+    return registerUser(name, role, email);
+  });
 
   ipcMain.handle("get-workers-id", async () => {
     const rows = await readSheet("Worker!A3:D");
@@ -86,7 +225,6 @@ app.whenReady().then(() => {
 
   ipcMain.handle("get-workers", async () => {
     const rows = await readSheet("Worker!A3:D");
-
     return rows.map(r => ({
       id: r[0] || "",
       name: r[1] || "",
@@ -169,12 +307,13 @@ app.whenReady().then(() => {
       console.log("Next worker ID:", nextId);
 
       const defaultPassword = "12121212";
+      const hashedPassword = await bcrypt.hash(defaultPassword, saltRounds);
       const roleId = "1";
 
       await appendSheet("Worker", [
         nextId.toString(),
         supervisorName,
-        defaultPassword,
+        hashedPassword,
         roleId
       ]);
       console.log("Supervisor added successfully");

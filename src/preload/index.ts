@@ -14,6 +14,9 @@ if (process.contextIsolated) {
       addSchedule: (payload: any) => ipcRenderer.invoke("add-schedule", payload),
       updateSchedule: (payload: any) => ipcRenderer.invoke("update-schedule", payload),
       addJobdesc: (name: string) => ipcRenderer.invoke("add-jobdesc", name),
+      googleLoginStart: () => ipcRenderer.invoke("google-login-start"),
+      login: (name: string, password: string) => ipcRenderer.invoke("login-user", name, password),
+      register: (name: string, role: string, email: string) => ipcRenderer.invoke("register-user", name, role, email),
     });
 
     contextBridge.exposeInMainWorld('electron', electronAPI)
