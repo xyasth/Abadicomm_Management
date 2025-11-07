@@ -324,6 +324,16 @@ export default function EditSchedule({ scheduleData, onBack, onSaveSuccess }: Ed
       return
     }
 
+    // --- START: Time Range Enforcement (The solution for 07:00 to 21:00) ---
+    const MIN_TIME = "07:00";
+    const MAX_TIME = "21:00";
+
+    if (startTime < MIN_TIME || startTime > MAX_TIME || endTime < MIN_TIME || endTime > MAX_TIME) {
+        showToast(`The event time must be between ${MIN_TIME} and ${MAX_TIME}.`, "error");
+        return;
+    }
+    // --- END: Time Range Enforcement ---
+
     if (startTime >= endTime) {
       showToast("End time must be after start time", "error");
       return;
@@ -451,6 +461,8 @@ export default function EditSchedule({ scheduleData, onBack, onSaveSuccess }: Ed
                   type="time"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
+                  min="07:00"
+                  max="21:00"
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-blue-50"
                   required
                 />
@@ -462,6 +474,8 @@ export default function EditSchedule({ scheduleData, onBack, onSaveSuccess }: Ed
                   type="time"
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
+                  min="07:00"
+                  max="21:00"
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-600 focus:outline-none transition bg-blue-50"
                   required
                 />
