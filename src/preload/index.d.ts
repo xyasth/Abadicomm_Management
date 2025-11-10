@@ -35,9 +35,8 @@ declare global {
       addJobdesc: (name: string) => Promise<{ ok: boolean; id?: number; name?: string; error?: string }>;
       addSupervisor: (name: string) => Promise<{ ok: boolean; id?: number; name?: string; error?: string }>;
 
-      googleLoginStart: () => Promise<{ success: boolean, message: string, role: string }>;
-      login: (name: string, password: string) => Promise<{ success: boolean, message: string, role: string }>;
-      register: (name: string, role: string, email: string) => Promise<{ success: boolean, message: string }>;
+      login: (name: string, password: string) => Promise<{ success: boolean, message: string, role: string, token: string }>;
+      register: (name: string, role: string, email: string, password: string, passwordConfirmation: string) => Promise<{ success: boolean, message: string }>;
     };
   }
 }
