@@ -26,7 +26,7 @@ interface WorkerAssignment {
   jobdescName: string
   supervisorId: string
   supervisorName: string
-  scheduleId?: string // Add this to track which schedule row this came from
+  scheduleId?: string
 }
 
 interface EditScheduleProps {
@@ -39,7 +39,7 @@ interface EditScheduleProps {
       worker_name: string;
       jobdesc_name: string;
       tempat?: string;
-      schedule_id?: string; // ID of the schedule entry
+      schedule_id?: string;
     }>;
     location?: string;
   };
@@ -291,6 +291,7 @@ export default function EditSchedule({ scheduleData, onBack, onSaveSuccess }: Ed
     }
   }
 
+  // ✅ UPDATED: Send ONE bulk update request for all workers
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -324,15 +325,13 @@ export default function EditSchedule({ scheduleData, onBack, onSaveSuccess }: Ed
       return
     }
 
-    // --- START: Time Range Enforcement (The solution for 07:00 to 21:00) ---
     const MIN_TIME = "07:00";
     const MAX_TIME = "21:00";
 
     if (startTime < MIN_TIME || startTime > MAX_TIME || endTime < MIN_TIME || endTime > MAX_TIME) {
-        showToast(`The event time must be between ${MIN_TIME} and ${MAX_TIME}.`, "error");
-        return;
+      showToast(`The event time must be between ${MIN_TIME} and ${MAX_TIME}.`, "error");
+      return;
     }
-    // --- END: Time Range Enforcement ---
 
     if (startTime >= endTime) {
       showToast("End time must be after start time", "error");
@@ -342,56 +341,37 @@ export default function EditSchedule({ scheduleData, onBack, onSaveSuccess }: Ed
     setIsSubmitting(true);
 
     try {
-      console.log("Submitting updates...");
-      console.log("IDs to delete:", scheduleIdsToDelete);
+      // ✅ Send ONE bulk update request with all workers
+      const payload = {
+        scheduleIdsToDelete: scheduleIdsToDelete,
+        schedules: assignments.map((assignment) => ({
+          workerId: assignment.workerId,
+          jobdescId: assignment.jobdescId,
+          supervisorId: assignment.supervisorId,
+        })),
+        date: date,
+        startTime: startTime,
+        endTime: endTime,
+        location: location,
+      };
 
-      // Update each worker assignment
-      const results = await Promise.all(
-        assignments.map(async (assignment) => {
-          const payload = {
-            scheduleIdsToDelete: scheduleIdsToDelete,
-            workerId: assignment.workerId,
-            jobdescId: assignment.jobdescId,
-            supervisorId: assignment.supervisorId,
-            date: date,
-            startTime: startTime,
-            endTime: endTime,
-            location: location,
-          };
+      console.log("Sending bulk update payload:", payload);
 
-          if ((window as any).electronAPI?.updateSchedule) {
-            const result = await (window as any).electronAPI.updateSchedule(payload);
-            return {
-              ...result,
-              workerName: assignment.workerName
-            };
-          }
-          return { ok: false, workerName: assignment.workerName, error: 'Update API not available' };
-        })
-      );
+      if (window.electronAPI?.updateSchedule) {
+        const result = await window.electronAPI.updateSchedule(payload);
 
-      const successCount = results.filter(r => r.ok).length;
-      const failedResults = results.filter(r => !r.ok);
-
-      if (successCount === assignments.length) {
-        showToast(`Successfully updated ${assignments.length} worker(s)!`, "success");
-        setTimeout(() => {
-          onSaveSuccess();
-        }, 1500);
-      } else if (successCount > 0) {
-        const errorMessages = failedResults
-          .map(r => `${r.workerName}: ${r.error || 'Unknown error'}`)
-          .join(', ');
-        showToast(`Partial success: ${successCount}/${assignments.length}. Errors: ${errorMessages}`, "error");
-      } else {
-        const errorMessages = failedResults
-          .map(r => r.error || 'Unknown error')
-          .join(', ');
-        showToast(`Failed to update: ${errorMessages}`, "error");
+        if (result.ok) {
+          showToast(`Successfully updated ${assignments.length} worker(s)!`, "success");
+          setTimeout(() => {
+            onSaveSuccess();
+          }, 1500);
+        } else {
+          showToast(result.error || "Failed to update schedule", "error");
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating schedule:", error);
-      showToast("Failed to update schedule", "error");
+      showToast(error.message || "Failed to update schedule", "error");
     } finally {
       setIsSubmitting(false);
     }

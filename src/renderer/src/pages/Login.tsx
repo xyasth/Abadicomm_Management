@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { LogIn } from "lucide-react"
+import { LogIn, User, Lock } from "lucide-react"
 
 type Props = {
   onAuthSuccess: (role: string) => void;
@@ -9,6 +9,8 @@ type Props = {
 }
 
 export default function Login({ onAuthSuccess, onNavigate }: Props) {
+  const [name, setName] = useState("")
+  const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
 
@@ -16,12 +18,19 @@ export default function Login({ onAuthSuccess, onNavigate }: Props) {
     setError("");
   }, []);
 
-  const handleGoogleLogin = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!name || !password) {
+      setError("Name and password are required");
+      return;
+    }
+
     setError("")
     setIsLoading(true)
 
     try {
-      const data = await window.electronAPI.googleLoginStart();
+      const data = await window.electronAPI.login(name, password);
       console.log("Login successful:", data.message);
       onAuthSuccess(data.role);
     } catch (apiError: any) {
@@ -32,10 +41,6 @@ export default function Login({ onAuthSuccess, onNavigate }: Props) {
     }
   }
 
-  // const goToRegister = () => {
-  //   onNavigate('register');
-  // }
-
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-sans">
       <div className="max-w-md w-full bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden">
@@ -45,14 +50,55 @@ export default function Login({ onAuthSuccess, onNavigate }: Props) {
               Welcome Back!
             </h2>
             <p className="text-gray-600 mt-2">
-              Please login with your Google account.
+              Please login to continue
             </p>
           </div>
 
-          <div>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                Name
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <User className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Enter your name"
+                  required
+                  className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0066FF] focus:border-transparent transition"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                Password
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  required
+                  className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0066FF] focus:border-transparent transition"
+                />
+              </div>
+            </div>
+
+            {error && <p className="text-sm text-red-600 text-center">{error}</p>}
+
             <button
-              onClick={handleGoogleLogin}
-              type="button"
+              type="submit"
               disabled={isLoading}
               className={`w-full flex justify-center items-center gap-3 py-3 px-4 rounded-lg text-white font-semibold transition ${
                 isLoading
@@ -61,17 +107,9 @@ export default function Login({ onAuthSuccess, onNavigate }: Props) {
               }`}
             >
               <LogIn size={18} />
-              {isLoading ? "Waiting for Google..." : "Login with Google"}
+              {isLoading ? "Logging in..." : "Login"}
             </button>
-          </div>
-
-          {error && <p className="text-sm text-red-600 text-center">{error}</p>}
-
-          {/* <div className="text-center">
-            <button onClick={goToRegister} className="text-sm text-[#0066FF] hover:text-[#0052cc] font-medium transition">
-              Don't have an account? Register
-            </button>
-          </div> */}
+          </form>
         </div>
       </div>
     </div>
