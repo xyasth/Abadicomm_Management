@@ -1,5 +1,11 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 
+interface RegisterResponse {
+    success: boolean;
+    message: string;
+    worker?: { name: string, email: string };
+}
+
 declare global {
   interface Window {
     electron: ElectronAPI
@@ -36,7 +42,7 @@ declare global {
       addSupervisor: (name: string) => Promise<{ ok: boolean; id?: number; name?: string; error?: string }>;
 
       login: (name: string, password: string) => Promise<{ success: boolean, message: string, role: string, token: string }>;
-      register: (name: string, role: string, email: string, password: string, passwordConfirmation: string) => Promise<{ success: boolean, message: string }>;
+      register: (name: string, role: number, email: string, password: string, password_confirmation: string) => Promise<RegisterResponse>;
     };
   }
 }

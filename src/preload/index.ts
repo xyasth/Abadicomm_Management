@@ -16,8 +16,7 @@ if (process.contextIsolated) {
       addJobdesc: (name: string) => ipcRenderer.invoke("add-jobdesc", name),
       addSupervisor: (name: string) => ipcRenderer.invoke("add-supervisor", name),
       login: (name: string, password: string) => ipcRenderer.invoke("login-user", name, password),
-      register: (name: string, role: string, email: string, password: string, passwordConfirmation: string) =>
-        ipcRenderer.invoke("register-user", name, role, email, password, passwordConfirmation),
+      register: (name: string, role: number, email: string, password: string, password_confirmation: string) => ipcRenderer.invoke("register-user", name, role, email, password, password_confirmation),
     });
 
     contextBridge.exposeInMainWorld('electron', electronAPI)

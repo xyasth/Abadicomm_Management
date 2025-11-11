@@ -14,8 +14,9 @@ function createWindow(): void {
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
-      contextIsolation: true
-    }
+      contextIsolation: true,
+      contentSecurityPolicy: "default-src 'self'; connect-src 'self' http://127.0.0.1:8000 http://localhost:8000;",
+    } as any
   })
 
   mainWindow.on('ready-to-show', () => {
@@ -55,9 +56,9 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle("register-user", async (_, name, role, email, password, passwordConfirmation) => {
+  ipcMain.handle("register-user", async (_, name, role, email, password, password_confirmation) => {
     try {
-      const data = await apiService.register(name, role, email, password, passwordConfirmation);
+      const data = await apiService.register(name, role, email, password, password_confirmation);
       return data;
     } catch (error: any) {
       throw new Error(error.response?.data?.message || error.message);
