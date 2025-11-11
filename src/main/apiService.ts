@@ -105,11 +105,30 @@ class ApiService {
     return response.data;
   }
 
+  // ✅ NEW: Bulk create for multiple workers
+  async addScheduleBulk(payload: {
+    schedules: Array<{
+      workerId: string;
+      jobdescId: string;
+      supervisorId: string;
+    }>;
+    date: string;
+    startTime: string;
+    endTime: string;
+    location: string;
+  }) {
+    const response = await this.client.post('/v1/schedules/bulk', payload);
+    return response.data;
+  }
+
+  // ✅ UPDATED: Bulk update for multiple workers
   async updateSchedule(payload: {
     scheduleIdsToDelete: string[];
-    workerId: string;
-    jobdescId: string;
-    supervisorId: string;
+    schedules: Array<{
+      workerId: string;
+      jobdescId: string;
+      supervisorId: string;
+    }>;
     date: string;
     startTime: string;
     endTime: string;

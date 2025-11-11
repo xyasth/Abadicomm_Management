@@ -132,6 +132,15 @@ app.whenReady().then(() => {
     }
   });
 
+  // ✅ NEW: Bulk add schedule
+  ipcMain.handle("add-schedule-bulk", async (_, payload) => {
+    try {
+      return await apiService.addScheduleBulk(payload);
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || error.message);
+    }
+  });
+
   ipcMain.handle("update-schedule", async (_, payload) => {
     try {
       return await apiService.updateSchedule(payload);

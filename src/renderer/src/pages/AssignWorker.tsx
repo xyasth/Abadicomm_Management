@@ -48,7 +48,8 @@ export default function AssignWorker() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Toast notification state
-  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({
+  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>
+  ({
     show: false,
     message: '',
     type: 'success'
@@ -205,6 +206,7 @@ export default function AssignWorker() {
     }
   }
 
+  // ✅ UPDATED: Send ONE bulk request for all workers
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -241,62 +243,47 @@ export default function AssignWorker() {
     setIsSubmitting(true);
 
     try {
-      const results = await Promise.all(
-        assignments.map(async (assignment) => {
-          const payload = {
-            workerId: assignment.workerId,
-            jobdescId: assignment.jobdescId,
-            supervisorId: assignment.supervisorId,
-            date: date,
-            startTime: startTime,
-            endTime: endTime,
-            location: location,
-          };
+      // ✅ Send ONE bulk request with all workers
+      const payload = {
+        schedules: assignments.map((assignment) => ({
+          workerId: assignment.workerId,
+          jobdescId: assignment.jobdescId,
+          supervisorId: assignment.supervisorId,
+        })),
+        date: date,
+        startTime: startTime,
+        endTime: endTime,
+        location: location,
+      };
 
-          if (window.electronAPI?.addSchedule) {
-            const result = await window.electronAPI.addSchedule(payload);
-            return {
-              ...result,
-              workerName: assignment.workerName
-            };
-          }
-          return { ok: false, workerName: assignment.workerName, error: 'Unknown error' };
-        })
-      );
+      console.log("Sending bulk payload:", payload);
 
-      const successCount = results.filter(r => r.ok).length;
-      const failedResults = results.filter(r => !r.ok);
+      if (window.electronAPI?.addScheduleBulk) {
+        const result = await window.electronAPI.addScheduleBulk(payload);
 
-      if (successCount === assignments.length) {
-        showToast(`Successfully assigned ${assignments.length} worker(s)!`, "success");
+        if (result.ok) {
+          showToast(`Successfully assigned ${assignments.length} worker(s)!`, "success");
 
-        setDate("");
-        setLocation("");
-        setStartTime("");
-        setEndTime("");
-        setAssignments([{
-          id: "1",
-          workerId: "",
-          workerName: "",
-          jobdescId: "",
-          jobdescName: "",
-          supervisorId: "",
-          supervisorName: ""
-        }]);
-      } else if (successCount > 0) {
-        const errorMessages = failedResults
-          .map(r => `${r.workerName}: ${r.error || 'Unknown error'}`)
-          .join(', ');
-        showToast(`Partial success: ${successCount}/${assignments.length}. Errors: ${errorMessages}`, "error");
-      } else {
-        const errorMessages = failedResults
-          .map(r => r.error || 'Unknown error')
-          .join(', ');
-        showToast(`Failed: ${errorMessages}`, "error");
+          setDate("");
+          setLocation("");
+          setStartTime("");
+          setEndTime("");
+          setAssignments([{
+            id: "1",
+            workerId: "",
+            workerName: "",
+            jobdescId: "",
+            jobdescName: "",
+            supervisorId: "",
+            supervisorName: ""
+          }]);
+        } else {
+          showToast(result.error || "Failed to assign workers", "error");
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error assigning workers:", error);
-      showToast("Failed to assign workers", "error");
+      showToast(error.message || "Failed to assign workers", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -476,17 +463,17 @@ export default function AssignWorker() {
           </div>
 
           <div className="flex justify-center pt-4">
-                <button
-                type="submit"
-                disabled={isSubmitting}
-                className={`px-8 py-3 font-bold rounded-lg transition shadow-md hover:shadow-lg text-lg ${
-                  isSubmitting
-                    ? "bg-gray-400 text-gray-700 cursor-not-allowed"
-                    : "bg-blue-500 hover:bg-blue-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-300"
-                }`}
-              >
-                {isSubmitting ? "Submitting..." : "Confirm Assignment"}
-              </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={`px-8 py-3 font-bold rounded-lg transition shadow-md hover:shadow-lg text-lg ${
+                isSubmitting
+                  ? "bg-gray-400 text-gray-700 cursor-not-allowed"
+                  : "bg-blue-500 hover:bg-blue-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-300"
+              }`}
+            >
+              {isSubmitting ? "Submitting..." : "Confirm Assignment"}
+            </button>
           </div>
         </form>
       </div>

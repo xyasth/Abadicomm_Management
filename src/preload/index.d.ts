@@ -27,16 +27,32 @@ declare global {
         location: string;
       }) => Promise<{ ok: boolean; id?: number; error?: string }>;
 
-      updateSchedule: (payload: {
-        scheduleIdsToDelete: string[];
-        workerId: string;
-        jobdescId: string;
-        supervisorId: string;
+      // ✅ NEW: Bulk add schedule
+      addScheduleBulk: (payload: {
+        schedules: Array<{
+          workerId: string;
+          jobdescId: string;
+          supervisorId: string;
+        }>;
         date: string;
         startTime: string;
         endTime: string;
         location: string;
-      }) => Promise<{ ok: boolean; id?: number; error?: string }>;
+      }) => Promise<{ ok: boolean; error?: string }>;
+
+      // ✅ UPDATED: Bulk update schedule
+      updateSchedule: (payload: {
+        scheduleIdsToDelete: string[];
+        schedules: Array<{
+          workerId: string;
+          jobdescId: string;
+          supervisorId: string;
+        }>;
+        date: string;
+        startTime: string;
+        endTime: string;
+        location: string;
+      }) => Promise<{ ok: boolean; error?: string }>;
 
       addJobdesc: (name: string) => Promise<{ ok: boolean; id?: number; name?: string; error?: string }>;
       addSupervisor: (name: string) => Promise<{ ok: boolean; id?: number; name?: string; error?: string }>;

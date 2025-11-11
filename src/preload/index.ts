@@ -12,6 +12,7 @@ if (process.contextIsolated) {
       getWorkersId: () => ipcRenderer.invoke("get-workers-id"),
       getKetua: () => ipcRenderer.invoke("get-ketua"),
       addSchedule: (payload: any) => ipcRenderer.invoke("add-schedule", payload),
+      addScheduleBulk: (payload: any) => ipcRenderer.invoke("add-schedule-bulk", payload), // ✅ NEW
       updateSchedule: (payload: any) => ipcRenderer.invoke("update-schedule", payload),
       addJobdesc: (name: string) => ipcRenderer.invoke("add-jobdesc", name),
       addSupervisor: (name: string) => ipcRenderer.invoke("add-supervisor", name),
